@@ -1,11 +1,16 @@
 ## Author: Joshua Hardenbrook - Princeton University - joshuarh@princeton.edu
+
+##PARAMETERS TO CHANGE###
+#(1) in the method build_grid() you must specify the values of the cuts to scan
+#(2) in the method apply_cut() you must specify how the grid will be applied
 from ROOT import gSystem, RooArgSet, RooFit
 gSystem.Load('libRooFit')
 from  optparse  import OptionParser
 import numpy as np
 import itertools, math
 import ROOT as rt
-
+import rootlogon
+rootlogon.style()
 rt.gROOT.SetBatch(True)
 
 parser = OptionParser()
@@ -34,11 +39,9 @@ parser.add_option("-d", "--dataset", dest="dataset",
 
 parser.print_help()
 
-def apply_cut(data,cut):
+def apply_cut(data, cut):
     id_cut = "mpizero > %f && pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (0, cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
-
 #    id_cut = "mpizero < %f && pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (.25,1 , 1, 1.5, .7, .7, .3, 7, 5)    
-
     es_cut = "pi_iseb || ((es_e1_1 + es_e1_2) > %f  && (es_e2_1 + es_e2_2) > %f)" % (cut[2],cut[2])
 
     if options.verbose: print id_cut,"\n","ES cut:", es_cut,"\n"
@@ -133,9 +136,12 @@ def build_grids():
 
     return (pi_grid, eta_grid)
 
-def fit_dataset(dataset):
-    t1 = dataset.reduce("mpizero < .2 && mpizero > .08")
-    x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .08, .2,"GeV")
+def fit_cut_dataset(dataset,cut):
+    #apply the cut
+    rdata = apply_cut(dataset,cut)    
+
+    t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
+    x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .12, .14,"GeV")
     sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .010, .005, .04,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
@@ -149,13 +155,14 @@ def fit_dataset(dataset):
     c4 = rt.RooRealVar("c4","c4",.1,-1,1)
     c5 = rt.RooRealVar("c5","c5",.1,-1,1)
     c6 = rt.RooRealVar("c6","c6",.3,-1,1)
+
+    #using a polynomial background
     bkg_pars = rt.RooArgList(c0,c1,c2,c3)
     bkg = rt.RooPolynomial("bkg","bkg", x, bkg_pars)
     
-#add the signal and the background
+    #add the signal and the background in a model
     n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1000,500,1e5)
     n_bkg = rt.RooRealVar("nbkg","background yield",2000,1000, 1e5)
-    
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
     
@@ -165,10 +172,11 @@ def fit_dataset(dataset):
     m.migrad()
     
     result = m.save()
+    result.Print()
     
-    #declare the sob range
+    #declare the signal over background range
     x.setRange("sobRange",mean.getVal()-2.*sigma.getVal(), mean.getVal()+2.*sigma.getVal())
-    x.setRange("FULL",.08,.2)
+    x.setRange("FULL",.05,.25)
 
     #calculate integrals
     integralBkg_sob = bkg.createIntegral(rt.RooArgSet(x),RooFit.NormSet(rt.RooArgSet(x)),RooFit.Range("sobRange"))
@@ -178,11 +186,14 @@ def fit_dataset(dataset):
     normBkg_full = integralBkg_full.getVal()
 
     bkg_scale = (normBkg_sob / normBkg_full)
-    
+
+    #put the frame on a canvas
+    canvas = rt.TCanvas()
+
     #make a frame
     frame = x.frame()
 
-    #plot plints
+    #plot points
     t1.plotOn(frame)
     #plot fit components
     model.plotOn(frame, RooFit.Components("bkg"),RooFit.LineStyle(rt.kDashed),RooFit.LineColor(rt.kBlue))
@@ -190,12 +201,29 @@ def fit_dataset(dataset):
     #plot the full fit
     model.plotOn(frame)
 
+    #draw the frame
+    frame.Draw()
 
+    ####compute the interesting values
+
+    #sob calculations
     n_s_sob = n_sig.getVal() * .9546
     n_b_sob = n_bkg.getVal() * bkg_scale
     s_over_b = n_s_sob / n_b_sob 
-    chi2 = frame.chiSquare()
+
+    #goodness of fit
     error_e = s_over_b * math.sqrt(math.pow(n_sig.getError() / n_sig.getVal(), 2) + math.pow(n_bkg.getError() / n_bkg.getVal(), 2))
+    chi2 = frame.chiSquare()
+    
+    #signal calculations
+    mean_val = mean.getVal()
+    sigma_val = sigma.getVal()
+    mu_over_err = mean.getVal() / mean.getError()
+
+    #efficiency calculation
+    total_events = data.numEntries()
+    post_selection = t1.numEntries()
+    eff = post_selection / total_events
     
     if options.verbose:
         result.Print()    
@@ -205,8 +233,31 @@ def fit_dataset(dataset):
         print "sob:", s_over_b
         print "chi^2:", chi2
         print "error_e:", error_e
+
+
+    #write the latex onto the canvas
+    lat = rt.TLatex()
+    lat.SetNDC()
+    lat.SetTextFont(42)
+    lat.SetTextSize(.04)
+    lat.SetTextColor(1)
+    
+    ymin = .83
+    xmin = .55
+    ypass = .06
+    
+    line = "S/B: %1.1f ( %1.1f / %1.1f)" % (s_over_b, n_s_sob, n_b_sob)
+    line2 = "reduced #chi^{2}: %f" % chi2
+    line3 = "#mu: %.2f, #sigma: %.2f, #mu/err: %.2f" % (mean_val,sigma_val,mu_over_err)
+    line4 = "Efficiency %.3f" % eff
+    
+    lat.DrawLatex(xmin,ymin,line)
+    lat.DrawLatex(xmin,ymin-ypass,line2)
+    lat.DrawLatex(xmin,ymin-2*ypass,line3)
+    lat.DrawLatex(xmin,ymin-3*ypass,line4)
+    
  
-    return (result, frame, n_s_sob, n_b_sob, s_over_b, chi2, error_e)
+    return (result, canvas, n_s_sob, n_b_sob, s_over_b, chi2, error_e, mean_val, sigma_val, mu_over_err, eff)
 
 #################
 ## MAIN METHOD ##
@@ -251,13 +302,13 @@ output = rt.TFile(options.outfilename,"RECREATE")
 
 #output files containing cut values and fit calculations
 fit_params = open("fit_result.txt","w")
-fit_params.write("GRID# \t N SIGNAL \t N BKG \t \t SOB \t CHI^2 \t ERROR_E \n")
+fit_params.write("GRID#\tN SIGNAL\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n")
 cut_values = open("cut_values.txt","w")
-cut_values.write("grid# \t ga_pt \t pi_pt \t elyr \t s4s9 \t iso \t ncri1 \t ncri2 \n")
+cut_values.write("grid#\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2 \n")
 
 #loop over each set of cuts and reduce the dataset + fit
 iev = 1
-for ii in pi_grid[0:5]:    
+for cut in pi_grid[0:5]:    
     print "Scanning grid point", iev, "..."
     
     if options.dataset == "no_file":
@@ -265,9 +316,10 @@ for ii in pi_grid[0:5]:
         break
     else:
         #write out the data after the cut is applied and the fit result
-        rdata = apply_cut(data,ii)    
-        fit_result = fit_dataset(rdata)
+        rdata = apply_cut(data,cut)
         rdata.Write("tree_%i" % iev)
+        fit_result = fit_cut_dataset(data,cut)
+
         #write the result
         fit_result[0].Write("fit_%i" % iev) 
         #write the frame
@@ -275,12 +327,14 @@ for ii in pi_grid[0:5]:
 
         #write out the values of the cuts    
         cut_values.write("%i \t" % iev)
-        for cut in ii: cut_values.write("%2.3f \t" % cut)
+        for cuts in cut: cut_values.write("%2.3f \t" % cuts)
         cut_values.write("\n")
 
         #write out the variables generated from the fit
         fit_params.write("%i \t" % iev)
-        for jj in fit_result[2:]: fit_params.write("%10.2f \t" % jj)
+        for jj in fit_result[2:]:
+            if jj > 10: fit_params.write("%6.1f\t" % jj)
+            else:  fit_params.write("%2.5f\t" % jj)
         fit_params.write("\n")
 
     iev+=1
