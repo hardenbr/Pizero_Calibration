@@ -30,6 +30,14 @@ parser.add_option("-n", "--nevents", dest="nevents",
                   help="only analyze the first n events",
                   action="store",type="int",default=-1)
 
+parser.add_option("-b", "--begin", dest="GRID_BEGIN",
+                  help="starting grid point (must specify end)",
+                  action="store",type="int",default=-1)
+
+parser.add_option("-e", "--end", dest="GRID_END",
+                  help="ending grid point (-1 means to the end of the grid)",
+                  action="store",type="int",default=-1)
+
 parser.add_option("-d", "--dataset", dest="dataset",
                   help="list of root files containing the processesed datasets. If this is not specified, the roodataset will be generated and with the name roo(NAME).root",
                   action="store",type="string",default="no_file")
@@ -40,7 +48,7 @@ parser.add_option("-d", "--dataset", dest="dataset",
 parser.print_help()
 
 def apply_cut(data, cut):
-    id_cut = "mpizero > %f && pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (0, cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
+    id_cut = "pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
 #    id_cut = "mpizero < %f && pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (.25,1 , 1, 1.5, .7, .7, .3, 7, 5)    
     es_cut = "pi_iseb || ((es_e1_1 + es_e1_2) > %f  && (es_e2_1 + es_e2_2) > %f)" % (cut[2],cut[2])
 
@@ -140,6 +148,11 @@ def fit_cut_dataset(dataset,cut):
     #apply the cut
     rdata = apply_cut(dataset,cut)    
 
+    #efficiency calculation
+    total_events = data.reduce("mpizero>.05&&mpizero<.3").numEntries()
+    post_selection = rdata.reduce("mpizero>.05&&mpizero<.3").numEntries()
+    eff = float(post_selection) / total_events
+
     t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .12, .14,"GeV")
@@ -148,17 +161,17 @@ def fit_cut_dataset(dataset,cut):
 
     
     #build the background from a polynomial
-    c0 = rt.RooRealVar("c0","c0",50,0,200)
-    c1 = rt.RooRealVar("c1","c1",-1,-1000,1000)
-    c2 = rt.RooRealVar("c2","c2",10,-1000,1000)
-    c3 = rt.RooRealVar("c3","c3",1,-100,100)
+    c0 = rt.RooRealVar("c0","c0",.2,-1,1)
+    c1 = rt.RooRealVar("c1","c1",-.1,-1,1)
+    c2 = rt.RooRealVar("c2","c2",.1,-1,1)
+    c3 = rt.RooRealVar("c3","c3",-.1,-1,1)
     c4 = rt.RooRealVar("c4","c4",.1,-1,1)
     c5 = rt.RooRealVar("c5","c5",.1,-1,1)
     c6 = rt.RooRealVar("c6","c6",.3,-1,1)
 
     #using a polynomial background
-    bkg_pars = rt.RooArgList(c0,c1,c2,c3)
-    bkg = rt.RooPolynomial("bkg","bkg", x, bkg_pars)
+    bkg_pars = rt.RooArgList(c0,c1,c2)
+    bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
     
     #add the signal and the background in a model
     n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1000,500,1e5)
@@ -188,7 +201,7 @@ def fit_cut_dataset(dataset,cut):
     bkg_scale = (normBkg_sob / normBkg_full)
 
     #put the frame on a canvas
-    canvas = rt.TCanvas()
+    canvas = rt.TCanvas("canvas_%f" % bkg_scale)
 
     #make a frame
     frame = x.frame()
@@ -220,10 +233,6 @@ def fit_cut_dataset(dataset,cut):
     sigma_val = sigma.getVal()
     mu_over_err = mean.getVal() / mean.getError()
 
-    #efficiency calculation
-    total_events = data.numEntries()
-    post_selection = t1.numEntries()
-    eff = post_selection / total_events
     
     if options.verbose:
         result.Print()    
@@ -246,10 +255,10 @@ def fit_cut_dataset(dataset,cut):
     xmin = .55
     ypass = .06
     
-    line = "S/B: %1.1f ( %1.1f / %1.1f)" % (s_over_b, n_s_sob, n_b_sob)
-    line2 = "reduced #chi^{2}: %f" % chi2
-    line3 = "#mu: %.2f, #sigma: %.2f, #mu/err: %.2f" % (mean_val,sigma_val,mu_over_err)
-    line4 = "Efficiency %.3f" % eff
+    line = "S/B: %.4f ( %1.1f / %1.1f)" % (s_over_b, n_s_sob, n_b_sob)
+    line2 = "reduced #chi^{2}: %.4f" % chi2
+    line3 = "#mu: %.4f, #sigma: %.4f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
+    line4 = "Efficiency %.6f" % eff
     
     lat.DrawLatex(xmin,ymin,line)
     lat.DrawLatex(xmin,ymin-ypass,line2)
@@ -301,14 +310,33 @@ rdata = None
 output = rt.TFile(options.outfilename,"RECREATE")
 
 #output files containing cut values and fit calculations
-fit_params = open("fit_result.txt","w")
-fit_params.write("GRID#\tN SIGNAL\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n")
-cut_values = open("cut_values.txt","w")
-cut_values.write("grid#\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2 \n")
+outfile_dir = options.outfilename[:-5]
+
+fit_params_string = "@@GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
+cut_string = "@@grid#\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n"
+
+#print "OUTPUT TXT FILES PREFIX:", outfile_dir
+#fit_params = open(outfile_dir+"_fit_result.txt","w")
+#fit_params.write("GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n")
+#cut_values = open(outfile_dir+"_cut_values.txt","w")
+#cut_values.write("grid#\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n")
 
 #loop over each set of cuts and reduce the dataset + fit
-iev = 1
-for cut in pi_grid[0:5]:    
+p1 = options.GRID_BEGIN
+p2 = options.GRID_END
+scan_points = None
+iev = p1
+
+#parse out the piece of the grid to scan
+if p1 != -1 and p2 != -1:
+    scan_points = pi_grid[p1:p2+1]
+elif p1 != -1 and p2 == -1:
+    scan_points = pi_grid[p1:]
+else:
+    scan_points = pi_grid
+    print "------WARNING!!!----- SCANNING ALL GRID POINTS"
+
+for cut in scan_points:    
     print "Scanning grid point", iev, "..."
     
     if options.dataset == "no_file":
@@ -326,23 +354,36 @@ for cut in pi_grid[0:5]:
         fit_result[1].Write("frame_%i" % iev)
 
         #write out the values of the cuts    
-        cut_values.write("%i \t" % iev)
-        for cuts in cut: cut_values.write("%2.3f \t" % cuts)
-        cut_values.write("\n")
-
+        cut_string += "@@%i \t" % iev
+        for cuts in cut: cut_string+="%2.3f \t" % cuts
+        cut_string += "\n"
+        
+        #cut_values.write("%i \t" % iev)
+        #for cuts in cut: cut_values.write("%2.3f \t" % cuts)
+        #cut_values.write("\n")
         #write out the variables generated from the fit
-        fit_params.write("%i \t" % iev)
+
+        fit_params_string += "@@%i \t" % iev
         for jj in fit_result[2:]:
-            if jj > 10: fit_params.write("%6.1f\t" % jj)
-            else:  fit_params.write("%2.5f\t" % jj)
-        fit_params.write("\n")
+            if jj > 10: fit_params_string+="%6.1f\t" % jj
+            else:  fit_params_string+="%2.5f\t" % jj
+        fit_params_string+="\n"
+
+#        fit_params.write("%i \t" % iev)
+#        for jj in fit_result[2:]:
+#            if jj > 10: fit_params.write("%6.1f\t" % jj)
+#            else:  fit_params.write("%2.5f\t" % jj)
+#        fit_params.write("\n")
 
     iev+=1
+    
 
 if options.dataset == "no_file": rdata.Write("tree_00")
 
+print cut_string
+print fit_params_string
 workspace.Write()
 output.Close()
-fit_params.close()
-cut_values.close()
+#fit_params.close()
+#cut_values.close()
 
