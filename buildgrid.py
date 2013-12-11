@@ -42,6 +42,8 @@ parser.add_option("-d", "--dataset", dest="dataset",
                   help="list of root files containing the processesed datasets. If this is not specified, the roodataset will be generated and with the name roo(NAME).root",
                   action="store",type="string",default="no_file")
 
+parser.add_option("-w","--write", dest="do_write", help="write the fits and canvases",
+                                   action="store_true", default=False)
 
 (options, args) = parser.parse_args()
 
@@ -149,8 +151,10 @@ def fit_cut_dataset(dataset,cut):
     rdata = apply_cut(dataset,cut)    
 
     #efficiency calculation
-    total_events = data.reduce("mpizero>.05&&mpizero<.3").numEntries()
-    post_selection = rdata.reduce("mpizero>.05&&mpizero<.3").numEntries()
+    eff_window_cut = "mpizero > .05 && mpizero < .3"
+    
+    total_events = (data.reduce(eff_window_cut)).numEntries()
+    post_selection = (rdata.reduce(eff_window_cut)).numEntries()
     eff = float(post_selection) / total_events
 
     t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
@@ -307,13 +311,13 @@ print "Number of grid points for pizero:",  len(pi_grid)
 
 rdata = None
 #output file containing fits and canvases
-output = rt.TFile(options.outfilename,"RECREATE")
+if options.do_write: output = rt.TFile(options.outfilename,"RECREATE")
 
 #output files containing cut values and fit calculations
 outfile_dir = options.outfilename[:-5]
 
-fit_params_string = "@@GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
-cut_string = "@@grid#\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n"
+fit_params_string = "@GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
+cut_string = "@grid#\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n"
 
 #print "OUTPUT TXT FILES PREFIX:", outfile_dir
 #fit_params = open(outfile_dir+"_fit_result.txt","w")
@@ -345,16 +349,17 @@ for cut in scan_points:
     else:
         #write out the data after the cut is applied and the fit result
         rdata = apply_cut(data,cut)
-        rdata.Write("tree_%i" % iev)
         fit_result = fit_cut_dataset(data,cut)
-
-        #write the result
-        fit_result[0].Write("fit_%i" % iev) 
-        #write the frame
-        fit_result[1].Write("frame_%i" % iev)
+        
+        if options.do_write:
+            rdata.Write("tree_%i" % iev)
+            #write the result
+            fit_result[0].Write("fit_%i" % iev) 
+            #write the frame
+            fit_result[1].Write("frame_%i" % iev)
 
         #write out the values of the cuts    
-        cut_string += "@@%i \t" % iev
+        cut_string += "@@@%i \t" % iev
         for cuts in cut: cut_string+="%2.3f \t" % cuts
         cut_string += "\n"
         
@@ -374,16 +379,19 @@ for cut in scan_points:
 #            if jj > 10: fit_params.write("%6.1f\t" % jj)
 #            else:  fit_params.write("%2.5f\t" % jj)
 #        fit_params.write("\n")
-
+    print "\n\n\n\n"
+    print cut_string
+    print fit_params_string
+    print "\n\n\n\n"
     iev+=1
     
 
 if options.dataset == "no_file": rdata.Write("tree_00")
 
-print cut_string
-print fit_params_string
-workspace.Write()
-output.Close()
+
+if options.do_write:
+    workspace.Write()
+    output.Close()
 #fit_params.close()
 #cut_values.close()
 
