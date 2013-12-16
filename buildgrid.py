@@ -12,6 +12,8 @@ import ROOT as rt
 import rootlogon
 rootlogon.style()
 rt.gROOT.SetBatch(True)
+RooFit.PrintLevel(-1)
+RooFit.Verbose(False)
 
 parser = OptionParser()
 parser.add_option("-f", "--file", dest="filename",
@@ -183,7 +185,7 @@ def fit_cut_dataset(dataset,cut):
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
     
-    t1.Print()
+#    t1.Print()
     nll = rt.RooNLLVar("nll","log likelihood var", model, t1, True)
     m = rt.RooMinuit(nll)
     m.migrad()
