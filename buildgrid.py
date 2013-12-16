@@ -36,6 +36,10 @@ parser.add_option("-b", "--begin", dest="GRID_BEGIN",
                   help="starting grid point (must specify end)",
                   action="store",type="int",default=-1)
 
+parser.add_option("-l", "--gridlist", dest="GRID_LIST",
+                  help="txt file listing grid points to scan. Separated by linebreaks",
+                  action="store",type="string",default="no_list")
+
 parser.add_option("-e", "--end", dest="GRID_END",
                   help="ending grid point (-1 means to the end of the grid)",
                   action="store",type="int",default=-1)
@@ -162,7 +166,7 @@ def fit_cut_dataset(dataset,cut):
     t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .12, .14,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .010, .005, .04,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .010, .009, .016,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     
@@ -180,8 +184,8 @@ def fit_cut_dataset(dataset,cut):
     bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
     
     #add the signal and the background in a model
-    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1000,500,1e5)
-    n_bkg = rt.RooRealVar("nbkg","background yield",2000,1000, 1e5)
+    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1001,1000,1e5)
+    n_bkg = rt.RooRealVar("nbkg","background yield",2000,100, 1e5)
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
     
@@ -303,8 +307,7 @@ else:
     
     #add all the datasets together
     data = roodatasets[0]
-    for ii in roodatasets[1:]:
-        data.append(ii)
+    for ii in roodatasets[1:]: data.append(ii)
 
 #build the cut grids
 (pi_grid, eta_grid) = build_grids()
@@ -330,19 +333,29 @@ cut_string = "@grid#\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n"
 #loop over each set of cuts and reduce the dataset + fit
 p1 = options.GRID_BEGIN
 p2 = options.GRID_END
+grid_list = options.GRID_LIST
 scan_points = None
-iev = p1
+iev_points = None
 
 #parse out the piece of the grid to scan
-if p1 != -1 and p2 != -1:
-    scan_points = pi_grid[p1:p2+1]
-elif p1 != -1 and p2 == -1:
-    scan_points = pi_grid[p1:]
+#either take the begining to end or read from the input file
+if p1 != -1 and p2 != -1 and grid_list == "no_list":
+    iev_points = range(p1,(p2+1))
+elif p1 != -1 and p2 == -1 and grid_list == "no_list":
+    iev_points = range(p1,len(pi_grid)+1)
+#if beginning end end are not specified and grid list is
+elif grid_list != "no_list":
+    #parse out the list 
+    list_file = open(grid_list)
+    list_file_lines = list_file.readlines()
+    iev_points = map(lambda(x):int(x.rstrip("\n")),list_file_lines)        
 else:
-    scan_points = pi_grid
+    iev_points = range(len(pi_grid)+1)
     print "------WARNING!!!----- SCANNING ALL GRID POINTS"
 
-for cut in scan_points:    
+
+#scan point by point
+for iev in iev_points:    
     print "Scanning grid point", iev, "..."
     
     if options.dataset == "no_file":
@@ -350,8 +363,8 @@ for cut in scan_points:
         break
     else:
         #write out the data after the cut is applied and the fit result
-        rdata = apply_cut(data,cut)
-        fit_result = fit_cut_dataset(data,cut)
+        rdata = apply_cut(data,pi_grid[iev])
+        fit_result = fit_cut_dataset(data,pi_grid[iev])
         
         if options.do_write:
             rdata.Write("tree_%i" % iev)
@@ -361,8 +374,9 @@ for cut in scan_points:
             fit_result[1].Write("frame_%i" % iev)
 
         #write out the values of the cuts    
+
         cut_string += "@@@%i \t" % iev
-        for cuts in cut: cut_string+="%2.3f \t" % cuts
+        for cuts in pi_grid[iev]: cut_string+="%2.3f \t" % cuts
         cut_string += "\n"
         
         #cut_values.write("%i \t" % iev)
