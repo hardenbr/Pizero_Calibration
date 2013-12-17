@@ -154,7 +154,7 @@ def build_grids():
 
     return (pi_grid, eta_grid)
 
-def fit_cut_dataset(dataset,cut):
+def fit_cut_dataset(dataset,cut,iev):
     #apply the cut
     rdata = apply_cut(dataset,cut)    
 
@@ -186,7 +186,7 @@ def fit_cut_dataset(dataset,cut):
     bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
     
     #add the signal and the background in a model
-    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1001,1000,3000)
+    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1001,1000,1800)
     n_bkg = rt.RooRealVar("nbkg","background yield",2000,100, 1e5)
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
@@ -213,7 +213,7 @@ def fit_cut_dataset(dataset,cut):
     bkg_scale = (normBkg_sob / normBkg_full)
 
     #put the frame on a canvas
-    canvas = rt.TCanvas("canvas_%f" % bkg_scale)
+    canvas = rt.TCanvas("canvas_%i" % iev)
 
     #make a frame
     frame = x.frame()
@@ -366,7 +366,7 @@ for iev in iev_points:
     else:
         #write out the data after the cut is applied and the fit result
         rdata = apply_cut(data,pi_grid[iev])
-        fit_result = fit_cut_dataset(data,pi_grid[iev])
+        fit_result = fit_cut_dataset(data,pi_grid[iev],iev)
         
         if options.do_write:
             rdata.Write("tree_%i" % iev)
