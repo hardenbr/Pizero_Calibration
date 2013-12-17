@@ -16,6 +16,8 @@ rootlogon.style()
 rt.gROOT.SetBatch(True)
 RooFit.PrintLevel(-1)
 RooFit.Verbose(False)
+rt.RooMsgService.instance().setGlobalKillBelow(RooFit.WARNING)
+
 
 parser = OptionParser()
 parser.add_option("-f", "--file", dest="filename",
@@ -55,7 +57,7 @@ parser.add_option("-w","--write", dest="do_write", help="write the fits and canv
 
 (options, args) = parser.parse_args()
 
-parser.print_help()
+#parser.print_help()
 
 def apply_cut(data, cut):
     id_cut = "pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
@@ -186,18 +188,20 @@ def fit_cut_dataset(dataset,cut,iev):
     bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
     
     #add the signal and the background in a model
-    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1001,1000,1800)
+    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1001,1000,3000)
     n_bkg = rt.RooRealVar("nbkg","background yield",2000,100, 1e5)
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
     
-#    t1.Print()
+    #    t1.Print()
     nll = rt.RooNLLVar("nll","log likelihood var", model, t1, True)
-    m = rt.RooMinuit(nll)
+    m = rt.RooMinuit(nll)    
+    m.setPrintLevel(-1)
+
     m.migrad()
     
     result = m.save()
-    result.Print()
+    #    result.Print()
     
     #declare the signal over background range
     x.setRange("sobRange",mean.getVal()-2.*sigma.getVal(), mean.getVal()+2.*sigma.getVal())
@@ -271,12 +275,13 @@ def fit_cut_dataset(dataset,cut,iev):
     line2 = "reduced #chi^{2}: %.4f" % chi2
     line3 = "#mu: %.4f, #sigma: %.4f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
     line4 = "Efficiency %.6f" % eff
+    line4 = "Grid #: %i" % iev
     
     lat.DrawLatex(xmin,ymin,line)
     lat.DrawLatex(xmin,ymin-ypass,line2)
     lat.DrawLatex(xmin,ymin-2*ypass,line3)
     lat.DrawLatex(xmin,ymin-3*ypass,line4)
-    
+    lat.DrawLatex(xmin,ymin-4*ypass,line5)
  
     return (result, canvas, n_s_sob, n_b_sob, s_over_b, chi2, error_e, mean_val, sigma_val, mu_over_err, eff)
 
@@ -323,14 +328,8 @@ if options.do_write: output = rt.TFile(options.outfilename,"RECREATE")
 #output files containing cut values and fit calculations
 outfile_dir = options.outfilename[:-5]
 
-fit_params_string = "@GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
-cut_string = "@grid#\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n"
-
-#print "OUTPUT TXT FILES PREFIX:", outfile_dir
-#fit_params = open(outfile_dir+"_fit_result.txt","w")
-#fit_params.write("GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n")
-#cut_values = open(outfile_dir+"_cut_values.txt","w")
-#cut_values.write("grid#\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n")
+fit_params_string = "@GRID#\t\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
+cut_string = "@grid#\t\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n"
 
 #loop over each set of cuts and reduce the dataset + fit
 p1 = options.GRID_BEGIN
@@ -366,7 +365,7 @@ for iev in iev_points:
     else:
         #write out the data after the cut is applied and the fit result
         rdata = apply_cut(data,pi_grid[iev])
-        fit_result = fit_cut_dataset(data,pi_grid[iev],iev)
+        fit_result = fit_cut_dataset(data, pi_grid[iev], iev)
         
         if options.do_write:
             rdata.Write("tree_%i" % iev)
@@ -376,40 +375,27 @@ for iev in iev_points:
             fit_result[1].Write("frame_%i" % iev)
 
         #write out the values of the cuts    
-
         cut_string += "@@@%i \t" % iev
         for cuts in pi_grid[iev]: cut_string+="%2.3f \t" % cuts
-        cut_string += "\n"
-        
-        #cut_values.write("%i \t" % iev)
-        #for cuts in cut: cut_values.write("%2.3f \t" % cuts)
-        #cut_values.write("\n")
-        #write out the variables generated from the fit
+        cut_string += "\n"        
 
         fit_params_string += "@@%i \t" % iev
+        if iev <= 9999: fit_params_string += "\t" 
+
         for jj in fit_result[2:]:
             if jj > 10: fit_params_string+="%6.1f\t" % jj
             else:  fit_params_string+="%2.5f\t" % jj
         fit_params_string+="\n"
 
-#        fit_params.write("%i \t" % iev)
-#        for jj in fit_result[2:]:
-#            if jj > 10: fit_params.write("%6.1f\t" % jj)
-#            else:  fit_params.write("%2.5f\t" % jj)
-#        fit_params.write("\n")
-    print "\n\n\n\n"
+    print "\n"
     print cut_string
     print fit_params_string
-    print "\n\n\n\n"
-    iev+=1
-    
+    print "\n"
 
 if options.dataset == "no_file": rdata.Write("tree_00")
-
 
 if options.do_write:
     workspace.Write()
     output.Close()
-#fit_params.close()
-#cut_values.close()
+
 
