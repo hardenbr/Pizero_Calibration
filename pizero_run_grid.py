@@ -69,7 +69,7 @@ os.system("mkdir " + output_dir+"/logs")
 os.system("mkdir " + output_dir+"/src")
 os.system("mkdir " + output_dir+"/res")
 os.system("cp buildgrid.py %s" % output_dir)
-os.system("cp ~/rootlogon.py %s" % output_dir)
+os.system("cp rootlogon.py %s" % output_dir)
 
 commands = []
 
