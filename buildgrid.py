@@ -2,7 +2,9 @@
 
 ##PARAMETERS TO CHANGE###
 #(1) in the method build_grid() you must specify the values of the cuts to scan
-#(2) in the method apply_cut() you must specify how the grid will be applied
+#(2) in the method apply_cut() you must specify how the grid cuts will be applied
+#(3) in the method fit_cut_dataset() you should put a reasonable range on the signal/bkg norm
+
 from ROOT import gSystem, RooArgSet, RooFit
 gSystem.Load('libRooFit')
 from  optparse  import OptionParser
@@ -184,7 +186,7 @@ def fit_cut_dataset(dataset,cut):
     bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
     
     #add the signal and the background in a model
-    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1001,1000,1e5)
+    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1001,1000,3000)
     n_bkg = rt.RooRealVar("nbkg","background yield",2000,100, 1e5)
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
