@@ -9,7 +9,7 @@ def style():
   rt.gStyle.SetCanvasBorderMode(0)
   rt.gStyle.SetCanvasColor(rt.kWhite)
   rt.gStyle.SetCanvasDefH(600)
-  rt.gStyle.SetCanvasDefW(800)
+  rt.gStyle.SetCanvasDefW(900)
   rt.gStyle.SetCanvasDefX(0)
   rt.gStyle.SetCanvasDefY(0)
   rt.gStyle.SetPadBorderMode(0)

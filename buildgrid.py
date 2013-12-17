@@ -267,15 +267,15 @@ def fit_cut_dataset(dataset,cut,iev):
     lat.SetTextSize(.04)
     lat.SetTextColor(1)
     
-    ymin = .83
-    xmin = .55
+    ymin = .91
+    xmin = .52
     ypass = .06
     
-    line = "S/B: %.4f ( %1.1f / %1.1f)" % (s_over_b, n_s_sob, n_b_sob)
+    line = "S/B: %.4f #pm %.5f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
     line2 = "reduced #chi^{2}: %.4f" % chi2
     line3 = "#mu: %.4f, #sigma: %.4f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
     line4 = "Efficiency %.6f" % eff
-    line4 = "Grid #: %i" % iev
+    line5 = "Grid #: %i" % iev
     
     lat.DrawLatex(xmin,ymin,line)
     lat.DrawLatex(xmin,ymin-ypass,line2)
