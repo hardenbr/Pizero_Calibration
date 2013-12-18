@@ -11,9 +11,12 @@ from  optparse  import OptionParser
 import numpy as np
 import itertools, math
 import ROOT as rt
+#canvas style file
 import rootlogon
 rootlogon.style()
+#dont draw anything
 rt.gROOT.SetBatch(True)
+#dont print  any roofit output besides errors/warnings
 RooFit.PrintLevel(-1)
 RooFit.Verbose(False)
 rt.RooMsgService.instance().setGlobalKillBelow(RooFit.WARNING)
@@ -48,6 +51,10 @@ parser.add_option("-e", "--end", dest="GRID_END",
                   help="ending grid point (-1 means to the end of the grid)",
                   action="store",type="int",default=-1)
 
+parser.add_option("-z", "--veto", dest="GRID_VETO",
+                  help="txt file listing grid scan results. The points with results will not be re-fit",
+                  action="store",type="string",default="no_list")
+
 parser.add_option("-d", "--dataset", dest="dataset",
                   help="list of root files containing the processesed datasets. If this is not specified, the roodataset will be generated and with the name roo(NAME).root",
                   action="store",type="string",default="no_file")
@@ -58,6 +65,21 @@ parser.add_option("-w","--write", dest="do_write", help="write the fits and canv
 (options, args) = parser.parse_args()
 
 #parser.print_help()
+
+#cut the numbers out of a result file
+def cut_veto_lines(file):
+    veto = open(file)
+    veto_lines = veto.readlines()
+    veto_lines_strip = map(lambda(x):x.rstrip("\n"),veto_lines)
+
+    out_list = []
+
+    for line in veto_lines_strip:
+        if "@@" not in line: continue
+        out_list.append(int(line.split()[0].split("@")[-1]))
+
+    return out_list
+
 
 def apply_cut(data, cut):
     id_cut = "pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
@@ -333,6 +355,7 @@ cut_string = "@grid#\t\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n"
 p1 = options.GRID_BEGIN
 p2 = options.GRID_END
 grid_list = options.GRID_LIST
+veto_list = options.GRID_VETO
 scan_points = None
 iev_points = None
 
@@ -352,6 +375,22 @@ else:
     iev_points = range(len(pi_grid)+1)
     print "------WARNING!!!----- SCANNING ALL GRID POINTS"
 
+#remove points specified in the veto list if specified
+if veto_list != "no_list":
+    print "Veto List Accepted..."
+    print "Previously...",len(iev_points),"points to run"
+
+    #read in the lines
+    veto_points = cut_veto_lines(options.GRID_VETO)
+    
+    if options.verbose: print "Veto List:", veto_points
+    print "Removing points from scan..." 
+
+    #remove from the iev list if it is in the list
+    for ii in veto_points: 
+        if ii in iev_points: iev_points.remove(ii)
+
+    print "Now...",len(iev_points),"points remaining"
 
 #scan point by point
 for iev in iev_points:    

@@ -52,6 +52,10 @@ parser.add_option("-g", "--gjobs", dest="gjob",
 		                    help="number of divisions of grid points ran per buildgrid.py call",
 		                    action="store",type="string")
 
+parser.add_option("-z", "--veto", dest="GRID_VETO",
+                  help="txt file listing grid scan results. The points with results will not be re-fit",
+                  action="store",type="string",default="no_list")
+
 
 (options, args) = parser.parse_args()
 
@@ -93,7 +97,10 @@ if len(pi_grid) % gjobs != 0: npoints.append((last_job_i,last_job_f))
 for ii in npoints:
 	#generate the commands to run on the raw and convert to trees
         output_name = output_dir+"res/grid_%i_%i.root" % ii
-	cmd = "python %s/buildgrid.py -d %s -o %s -b %i -e %i \n" % (output_dir, pwd+"/"+options.list , output_name, ii[0], ii[1])
+	cmd = "python %s/buildgrid.py -d %s -o %s -b %i -e %i" % (output_dir, pwd+"/"+options.list , output_name, ii[0], ii[1])
+        if options.GRID_VETO != "no_list": cmd += " -z %s \n" % options.GRID_VETO
+        else: cmd+="\n"
+
 	commands.append(cmd)
 
 print len(commands),njobs
