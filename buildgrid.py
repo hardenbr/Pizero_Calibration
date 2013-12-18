@@ -413,6 +413,7 @@ for iev in iev_points:
 
         #write out the values of the cuts    
         cut_string += "@@@%i \t" % iev
+        if iev <= 9999: cut_string += "\t" 
         for cuts in pi_grid[iev]: cut_string+="%2.3f \t" % cuts
         cut_string += "\n"        
 
