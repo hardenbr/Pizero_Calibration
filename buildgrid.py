@@ -169,8 +169,8 @@ def fit_cut_dataset(dataset,cut,iev):
 
     t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
-    mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .12, .14,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .010, .009, .015,"GeV")
+    mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .12, .135,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .013, .011, .0145,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     
