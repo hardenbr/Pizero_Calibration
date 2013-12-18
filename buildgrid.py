@@ -170,7 +170,7 @@ def fit_cut_dataset(dataset,cut,iev):
     t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .12, .14,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .010, .009, .016,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .010, .009, .015,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     
@@ -248,7 +248,6 @@ def fit_cut_dataset(dataset,cut,iev):
     mean_val = mean.getVal()
     sigma_val = sigma.getVal()
     mu_over_err = mean.getVal() / mean.getError()
-
     
     if options.verbose:
         result.Print()    
@@ -258,7 +257,6 @@ def fit_cut_dataset(dataset,cut,iev):
         print "sob:", s_over_b
         print "chi^2:", chi2
         print "error_e:", error_e
-
 
     #write the latex onto the canvas
     lat = rt.TLatex()
