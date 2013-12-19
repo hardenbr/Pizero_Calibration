@@ -194,7 +194,6 @@ def fit_cut_dataset(dataset,cut,iev):
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .12, .135,"GeV")
     sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .013, .011, .0145,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
-
     
     #build the background from a polynomial
     c0 = rt.RooRealVar("c0","c0",.2,-1,1)
