@@ -364,7 +364,7 @@ if p1 != -1 and p2 != -1 and grid_list == "no_list":
     iev_points = range(p1,(p2+1))
 elif p1 != -1 and p2 == -1 and grid_list == "no_list":
     iev_points = range(p1,len(pi_grid)+1)
-#if beginning end end are not specified and grid list is
+#if beginning and end are not specified and grid list is specified
 elif grid_list != "no_list":
     #parse out the list 
     list_file = open(grid_list)
@@ -410,15 +410,18 @@ for iev in iev_points:
             #write the frame
             fit_result[1].Write("frame_%i" % iev)
 
-        #write out the values of the cuts    
+        #write out the values of the cuts  
+        #make sure tabbing is correct for output  
         cut_string += "@@@%i \t" % iev
         if iev <= 9999: cut_string += "\t" 
         for cuts in pi_grid[iev]: cut_string+="%2.3f \t" % cuts
         cut_string += "\n"        
 
+        #make sure tabbing is correct for output
         fit_params_string += "@@%i \t" % iev
         if iev <= 9999: fit_params_string += "\t" 
 
+        #format the result
         for jj in fit_result[2:]:
             if jj > 10: fit_params_string+="%6.1f\t" % jj
             else:  fit_params_string+="%2.5f\t" % jj
