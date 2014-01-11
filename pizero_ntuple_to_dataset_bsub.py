@@ -33,6 +33,10 @@ parser.print_help()
 pwd = os.getenv("PWD")
 output_dir = options.output
 
+#add the style file
+os.system("cp rootlogon.py %s" % output_dir)
+
+
 #OPEN THE FILE_LIST
 file_open = open(options.list,"r")
 
