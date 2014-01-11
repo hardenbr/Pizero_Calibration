@@ -62,6 +62,15 @@ parser.add_option("-d", "--dataset", dest="dataset",
 parser.add_option("-w","--write", dest="do_write", help="write the fits and canvases",
                                    action="store_true", default=False)
 
+parser.add_option("--eta_b", dest="ETA_BEGIN",
+                  help="minimum of eta range. This is only to be used for the dataset conversion i.e. the -f flag",
+                  action="store",type="float",default=0)
+
+parser.add_option("--eta_e", dest="ETA_END",
+                  help="maximum of eta range.  This is only to be used for the dataset conversion i.e. the -f flag",
+                  action="store",type="float",default=1000)
+
+
 (options, args) = parser.parse_args()
 
 #parser.print_help()
@@ -100,10 +109,12 @@ def set_values(set,tree,ii):
     set.setRealValue("pt_g1",tree.STr2_ptG1_rec[ii])
     set.setRealValue("pt_g2",tree.STr2_ptG2_rec[ii])
     set.setRealValue("pi_pt",tree.STr2_ptPi0_rec[ii])
+    set.setRealValue("pi_rec_eta",tree.STr2_etaPi0_rec[ii])
     set.setRealValue("es_e1_1",tree.STr2_Es_e1_1[ii])
     set.setRealValue("es_e1_2",tree.STr2_Es_e1_2[ii])
     set.setRealValue("es_e2_1",tree.STr2_Es_e2_1[ii])
     set.setRealValue("es_e2_2",tree.STr2_Es_e2_2[ii])
+
     return set
 
 def build_workspace(input_file):
@@ -117,7 +128,7 @@ def build_workspace(input_file):
     workspace = rt.RooWorkspace("workspace")
 
     #declare our variables with ranges
-    variables = ["npizero[1,0,1000]","mpizero[.1., .05., .25]","pi_iseb[0,0,1]","pi_iso[0,-10,10]","pi_s4s9_1[0,0,10]","pi_s4s9_2[0,0,10]","pi_ncri_1[0,0,10]","pi_ncri_2[0,0,10]","pt_g1[0,0,20]","pt_g2[0,0,20]","es_e1_1[0,0,10]","es_e1_2[0,0,10]","es_e2_1[0,0,10]","es_e2_2[0,0,10]","pi_pt[0,0,20]"]
+    variables = ["npizero[1,0,1000]","mpizero[.1., .05., .25]","pi_iseb[0,0,1]","pi_iso[0,-10,10]","pi_s4s9_1[0,0,10]","pi_s4s9_2[0,0,10]","pi_ncri_1[0,0,10]","pi_ncri_2[0,0,10]","pt_g1[0,0,20]","pt_g2[0,0,20]","es_e1_1[0,0,10]","es_e1_2[0,0,10]","es_e2_1[0,0,10]","es_e2_2[0,0,10]","pi_pt[0,0,20]","pi_rec_eta[0,-10,10]"]
 
     #factory all the variables
     for v in variables:
@@ -314,6 +325,14 @@ if options.dataset == "no_file":
     #get the input file
     input_file = rt.TFile(options.filename)
     (workspace,data) = build_workspace(input_file)
+
+    eta_b = options.BEGIN_ETA
+    eta_e = options.END_ETA
+
+    if eta_b != 0 or eta_e < 10:
+        #rather than doing absoluate value, use square
+        data = data.reduce("pi_rec_eta*pi_rec_eta > %f && pi_rec_eta*pi_rec_eta < %f" % (eta_b*eta_b,eta_e*eta_e))
+        
 
 #if the datset is specified added the roodatsets into one dataset
 else:

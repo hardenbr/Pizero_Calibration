@@ -16,6 +16,14 @@ parser.add_option("-j", "--jobs", dest="jobs",
 		                    help="number of jobs to run at once",
 		                    action="store",type="string")
 
+parser.add_option("--eta_b", dest="ETA_BEGIN",
+                  help="minimum of eta range",
+                  action="store",type="float",default=0)
+
+parser.add_option("--eta_e", dest="ETA_END",
+                  help="maximum of eta range.",
+                  action="store",type="float",default=1000)
+
 
 (options, args) = parser.parse_args()
 
@@ -54,8 +62,17 @@ for ii in range(n_file):
 
 	#generate the commands to run on the raw and convert to trees
         output_name = output_dir+"/res/roo" + files[ii].split("/")[-1] 
+	
+	eta_b = options.ETA_BEGIN
+	eta_e = options.ETA_END
+	cmd = ""
 
-	cmd = "python %s/buildgrid.py -f %s -o %s \n" % (output_dir, files[ii], output_name)
+	#if the eta range is specified pass this to buildgrid and change the output name of the file
+	if eta_b != 0 or eta_e < 10:
+		output_name != "_%2.2f_%2.2f" % (eta_b,eta_e)
+		cmd = "python %s/buildgrid.py -f %s -o %s --eta_b %f --eta_e %f" % (output_dir, files[ii], output_name, eta_b, eta_e)
+	else:
+		cmd = "python %s/buildgrid.py -f %s -o %s" % (output_dir, files[ii], output_name)
 
 	commands.append(cmd)
 
