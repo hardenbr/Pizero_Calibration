@@ -414,12 +414,12 @@ if veto_list != "no_list":
 
 #scan point by point
 for iev in iev_points:    
-    print "Scanning grid point", iev, "..."
-    
+
     if options.dataset == "no_file":
         rdata = data 
         break
     else:
+        print "Scanning grid point", iev, "..."
         #write out the data after the cut is applied and the fit result
         rdata = apply_cut(data,pi_grid[iev])
         fit_result = fit_cut_dataset(data, pi_grid[iev], iev)
