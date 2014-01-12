@@ -326,8 +326,8 @@ if options.dataset == "no_file":
     input_file = rt.TFile(options.filename)
     (workspace,data) = build_workspace(input_file)
 
-    eta_b = options.BEGIN_ETA
-    eta_e = options.END_ETA
+    eta_b = options.ETA_BEGIN
+    eta_e = options.ETA_END
 
     if eta_b != 0 or eta_e < 10:
         #rather than doing absoluate value, use square
