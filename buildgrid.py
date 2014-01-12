@@ -324,7 +324,7 @@ def fit_cut_dataset(dataset,cut,iev):
 if options.dataset == "no_file":
     #get the input file
     input_file = rt.TFile(options.filename)
-    tree = file.Get("Tree_HLT")
+    tree = input_file.Get("Tree_HLT")
 
     eta_b = options.ETA_BEGIN
     eta_e = options.ETA_END
