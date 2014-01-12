@@ -389,7 +389,7 @@ elif grid_list != "no_list":
     list_file = open(grid_list)
     list_file_lines = list_file.readlines()
     iev_points = map(lambda(x):int(x.rstrip("\n")),list_file_lines)        
-else:
+elif options.dataset != "no_file":
     iev_points = range(len(pi_grid)+1)
     print "------WARNING!!!----- SCANNING ALL GRID POINTS"
 
