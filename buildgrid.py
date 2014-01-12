@@ -320,6 +320,8 @@ def fit_cut_dataset(dataset,cut,iev):
 ##             ## 
 #################
 
+data = None
+
 #build the data workspace if there is no rooDatasets Specified
 if options.dataset == "no_file":
     #get the input file
@@ -351,7 +353,7 @@ else:
 
     #build the workspace and extract the roodatasets
     for ii in dataset_file_lines_stripped:        
-        (data_temp, workspace) = build_workspace(ii)
+        (workspace, data_temp) = build_workspace(rt.TFile(ii))
         roodatasets.append(data_temp)
     
     #add all the datasets together
@@ -420,7 +422,7 @@ for iev in iev_points:
     else:
         print "Scanning grid point", iev, "..."
         #write out the data after the cut is applied and the fit result
-        rdata = apply_cut(data,pi_grid[iev])
+        rdata = apply_cut(data, pi_grid[iev])
         fit_result = fit_cut_dataset(data, pi_grid[iev], iev)
         
         if options.do_write:
