@@ -74,7 +74,7 @@ for ii in range(n_file):
 
 	#if the eta range is specified pass this to buildgrid and change the output name of the file
 	if eta_b != 0 or eta_e < 10:
-		output_name += "_%2.2f_%2.2f" % (eta_b,eta_e)
+		output_name = output_name[:-5]+ "_%2.2f_%2.2f.root" % (eta_b,eta_e)
 		cmd = "python %s/buildgrid.py -w -f %s -o %s --eta_b %f --eta_e %f \n" % (output_dir, files[ii], output_name, eta_b, eta_e)
 	else:
 		cmd = "python %s/buildgrid.py -w -f %s -o %s \n" % (output_dir, files[ii], output_name)

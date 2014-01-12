@@ -392,6 +392,8 @@ elif grid_list != "no_list":
 elif options.dataset != "no_file":
     iev_points = range(len(pi_grid)+1)
     print "------WARNING!!!----- SCANNING ALL GRID POINTS"
+else:
+    iev_points = [0]
 
 #remove points specified in the veto list if specified
 if veto_list != "no_list":
