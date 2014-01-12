@@ -335,6 +335,7 @@ if options.dataset == "no_file":
 
     out_tree = tree.CopyTree(cut_string)
 
+    #save the tree close the file and exit the script
     out_tree.Write()
     outfile.Close()
     exit(1)
@@ -348,12 +349,10 @@ else:
     roodatasets = []
     workspace = None
 
-    for ii in dataset_file_lines_stripped:
-        workspace_file = rt.TFile(ii)
-        data_temp = workspace_file.Get("tree_00")
-
+    #build the workspace and extract the roodatasets
+    for ii in dataset_file_lines_stripped:        
+        (data_temp, workspace) = build_workspace(ii)
         roodatasets.append(data_temp)
-        workspace = workspace_file.Get("workspace")
     
     #add all the datasets together
     data = roodatasets[0]
@@ -397,8 +396,6 @@ elif grid_list != "no_list":
 elif options.dataset != "no_file":
     iev_points = range(len(pi_grid)+1)
     print "------WARNING!!!----- SCANNING ALL GRID POINTS"
-else:
-    iev_points = [0]
 
 #remove points specified in the veto list if specified
 if veto_list != "no_list":
@@ -419,7 +416,6 @@ if veto_list != "no_list":
 
 #scan point by point
 for iev in iev_points:    
-
     if options.dataset == "no_file": break
     else:
         print "Scanning grid point", iev, "..."
