@@ -15,7 +15,7 @@ Step 3) The grid points which you would like the fit plot should be run with the
 Helpful flags:
 
 "-z": you can pass a log file to build_grid.py containing the results of step 2. All points which were fit and completed will not be scanned (vetoed)
-"-l": you can pass a txt file (separated by line breaks) of specific grid points to scan and avoid doing the
+"-l": you can pass a txt file (separated by line breaks) of specific grid points to scan and avoid doing the complete scan.
 
 pizero_run_grid.py
 -----------------

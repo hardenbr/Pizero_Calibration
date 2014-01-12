@@ -324,15 +324,20 @@ def fit_cut_dataset(dataset,cut,iev):
 if options.dataset == "no_file":
     #get the input file
     input_file = rt.TFile(options.filename)
-    (workspace,data) = build_workspace(input_file)
+    tree = file.Get("Tree_HLT")
 
     eta_b = options.ETA_BEGIN
     eta_e = options.ETA_END
 
-    if eta_b != 0 or eta_e < 10:
-        #rather than doing absoluate value, use square
-        data = data.reduce("pi_rec_eta*pi_rec_eta > %f && pi_rec_eta*pi_rec_eta < %f" % (eta_b*eta_b,eta_e*eta_e))
-        
+    outfile = rt.TFile(options.outfilename,"RECREATE")
+    
+    cut_string = "STr2_etaPi0_rec*STr2_etaPi0_rec > %f && STr2_etaPi0_rec*STr2_etaPi0_rec < %f && STr2_mPi0_rec >0" % (eta_b*eta_b, eta_e*eta_e)
+
+    out_tree = tree.CopyTree(cut_string)
+
+    out_tree.Write()
+    outfile.Close()
+    exit(1)
 
 #if the datset is specified added the roodatsets into one dataset
 else:
@@ -415,9 +420,7 @@ if veto_list != "no_list":
 #scan point by point
 for iev in iev_points:    
 
-    if options.dataset == "no_file":
-        rdata = data 
-        break
+    if options.dataset == "no_file": break
     else:
         print "Scanning grid point", iev, "..."
         #write out the data after the cut is applied and the fit result
@@ -452,8 +455,6 @@ for iev in iev_points:
     print cut_string
     print fit_params_string
     print "\n"
-
-if options.dataset == "no_file": rdata.Write("tree_00")
 
 if options.do_write:
     workspace.Write()

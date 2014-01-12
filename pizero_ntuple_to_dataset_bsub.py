@@ -66,7 +66,7 @@ commands = []
 for ii in range(n_file):
 
 	#generate the commands to run on the raw and convert to trees
-        output_name = output_dir+"/res/roo" + files[ii].split("/")[-1] 
+        output_name = output_dir+"/res/" + files[ii].split("/")[-1] 
 	
 	eta_b = options.ETA_BEGIN
 	eta_e = options.ETA_END
