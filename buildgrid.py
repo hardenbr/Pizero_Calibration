@@ -2,8 +2,8 @@
 
 ##PARAMETERS TO CHANGE###
 #(1) in the method build_grid() you must specify the values of the cuts to scan
-#(2) in the method apply_cut() you must specify how the grid cuts will be applied
-#(3) in the method fit_cut_dataset() you should put a reasonable range on the signal/bkg norm
+#(2) in the method apply_tree_cut() you must specify how the grid cuts will be applied
+#(3) in the method fit_dataset() you should put a reasonable range on the signal/bkg norm
 
 from ROOT import gSystem, RooArgSet, RooFit
 gSystem.Load('libRooFit')
@@ -90,12 +90,15 @@ def cut_veto_lines(file):
     return out_list
 
 def apply_tree_cut(tree, cut):
-    id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_S4S9_1 > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
+    id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
 
     es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])
+    
+    print id_cut, "\n", es_cut
 
+    #apply the cuts
     cut_tree_1 = tree.CopyTree(id_cut)
-    cut_tree_2 = cut_tree1.CopyTree(es_cut)
+    cut_tree_2 = cut_tree_1.CopyTree(es_cut)
 
     return cut_tree_2
 
@@ -126,10 +129,10 @@ def set_values(set,tree,ii):
 
     return set
 
-def build_workspace(chain):
+def build_workspace(tree):
 
     #build a list of the tree
-    chain.Draw(">>iterlist","STr2_mPi0_rec >0","entrylist")
+    tree.Draw(">>iterlist","STr2_mPi0_rec >0","entrylist")
     itlist = rt.gDirectory.Get("iterlist")
     
     #build the workspace
@@ -195,14 +198,12 @@ def build_grids():
 
     return (pi_grid, eta_grid)
 
-def fit_cut_dataset(dataset,cut,iev):
-    #apply the cut
-    rdata = apply_cut(dataset,cut)    
+def fit_dataset(rdata,iev):
 
     #efficiency calculation
     eff_window_cut = "mpizero > .05 && mpizero < .3"
     
-    total_events = (data.reduce(eff_window_cut)).numEntries()
+    total_events = (rdata.reduce(eff_window_cut)).numEntries()
     post_selection = (rdata.reduce(eff_window_cut)).numEntries()
     eff = float(post_selection) / total_events
 
@@ -355,8 +356,14 @@ else:
     dataset_file_lines_stripped = map(lambda(x):x.rstrip("\n"),dataset_file_lines)    
 
     #add all the trees to the tree_set
-    for ii in dataset_file_lines_stripped:
-        tree_set.append(rt.TFile(ii).Get("Tree_HLT"))
+    temp_file = None
+    
+    #build the list of files
+    file_set = map(lambda(x):rt.TFile(x),dataset_file_lines_stripped)
+    #build the list of trees in the files
+    tree_set = map(lambda(x):x.Get("Tree_HLT"), file_set)
+
+    print "ENTRIES",tree_set[0].GetEntries()
 
 #build the cut grids
 (pi_grid, eta_grid) = build_grids()
@@ -419,23 +426,26 @@ for iev in iev_points:
     if options.dataset == "no_file": break
     else:
         print "Scanning grid point", iev, "..."
-        #write out the data after the cut is applied and the fit result
 
-        tree_set_temp = []
+        #make a new list of trees with the cut applied
+        tree_set_temp = map(lambda(x):apply_tree_cut(x,pi_grid[iev]), tree_set)
 
-        # make a new set of trees with the correct cut applied
-        for tree in tree_set:
-            tree_set_temp.append(apply_tree_cut(tree, pi_grid[iev]))
+        # add all the trees with cuts applied together
+        list = rt.TList() 
+        map(lambda(x):list.Add(x),tree_set_temp)
 
-        # chain all the trees with cuts applied together
-        chain = rt.TChain("Tree_HLT")
-        for ii in tree_set_temp: chain.Add(ii)
+        print list
+
+        sum_trees = rt.TTree.MergeTrees(list)
+        print sum_trees
+
+        sum_trees.SetName("Tree_HLT")
 
         #collect the workspace and reduced data
-        (workspace,rdata) = build_workspace(chain)
+        (workspace,rdata) = build_workspace(sum_trees)
 
         #generate the fit result
-        fit_result = fit_cut_dataset(data, pi_grid[iev], iev)
+        fit_result = fit_dataset(rdata, iev)
         
         if options.do_write:
             rdata.Write("tree_%i" % iev)
