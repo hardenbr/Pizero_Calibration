@@ -428,7 +428,9 @@ for iev in iev_points:
     else:
         print "Scanning grid point", iev, "..."
 
+
         #make a new list of trees with the cut applied
+        print "Applying Cuts to Trees..."
         tree_set_temp = map(lambda(x):apply_tree_cut(x,pi_grid[iev]), tree_set)
 
         # add all the trees with cuts applied together
@@ -439,9 +441,11 @@ for iev in iev_points:
         sum_trees.SetName("Tree_HLT")
 
         #collect the workspace and reduced data
+        print "Building Workspace + RooDataset from Cut Trees..."
         (workspace,rdata) = build_workspace(sum_trees)
 
         #generate the fit result
+        print "Fitting RooDataset..."
         fit_result = fit_dataset(rdata, iev)
         
         if options.do_write:
