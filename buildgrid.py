@@ -89,6 +89,15 @@ def cut_veto_lines(file):
 
     return out_list
 
+def apply_tree_cut(tree, cut):
+    id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_S4S9_1 > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
+
+    es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])
+
+    cut_tree_1 = tree.CopyTree(id_cut)
+    cut_tree_2 = cut_tree1.CopyTree(es_cut)
+
+    return cut_tree_2
 
 def apply_cut(data, cut):
     id_cut = "pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
@@ -117,11 +126,10 @@ def set_values(set,tree,ii):
 
     return set
 
-def build_workspace(input_file):
-    tree = input_file.Get("Tree_HLT")
+def build_workspace(chain):
 
     #build a list of the tree
-    tree.Draw(">>iterlist","STr2_mPi0_rec >0","entrylist")
+    chain.Draw(">>iterlist","STr2_mPi0_rec >0","entrylist")
     itlist = rt.gDirectory.Get("iterlist")
     
     #build the workspace
@@ -131,8 +139,7 @@ def build_workspace(input_file):
     variables = ["npizero[1,0,1000]","mpizero[.1., .05., .25]","pi_iseb[0,0,1]","pi_iso[0,-10,10]","pi_s4s9_1[0,0,10]","pi_s4s9_2[0,0,10]","pi_ncri_1[0,0,10]","pi_ncri_2[0,0,10]","pt_g1[0,0,20]","pt_g2[0,0,20]","es_e1_1[0,0,10]","es_e1_2[0,0,10]","es_e2_1[0,0,10]","es_e2_2[0,0,10]","pi_pt[0,0,20]","pi_rec_eta[0,-10,10]"]
 
     #factory all the variables
-    for v in variables:
-        workspace.factory(v)    
+    for v in variables: workspace.factory(v)    
 
     #make the RooDataset
     args = workspace.allVars()
@@ -153,8 +160,7 @@ def build_workspace(input_file):
         a = rt.RooArgSet(args)
 
         # for each reconstructed pion, add its values to the dataset
-        for ii in range(tree.STr2_NPi0_rec):
-            data.add(set_values(a,tree,ii))    
+        for ii in range(tree.STr2_NPi0_rec): data.add(set_values(a,tree,ii))    
 
     getattr(workspace,'import')(data)    
 
@@ -320,7 +326,7 @@ def fit_cut_dataset(dataset,cut,iev):
 ##             ## 
 #################
 
-data = None
+tree_set = []
 
 #build the data workspace if there is no rooDatasets Specified
 if options.dataset == "no_file":
@@ -348,17 +354,9 @@ else:
     dataset_file_lines = dataset_file.readlines()
     dataset_file_lines_stripped = map(lambda(x):x.rstrip("\n"),dataset_file_lines)    
 
-    roodatasets = []
-    workspace = None
-
-    #build the workspace and extract the roodatasets
-    for ii in dataset_file_lines_stripped:        
-        (workspace, data_temp) = build_workspace(rt.TFile(ii))
-        roodatasets.append(data_temp)
-    
-    #add all the datasets together
-    data = roodatasets[0]
-    for ii in roodatasets[1:]: data.append(ii)
+    #add all the trees to the tree_set
+    for ii in dataset_file_lines_stripped:
+        tree_set.append(rt.TFile(ii).Get("Tree_HLT"))
 
 #build the cut grids
 (pi_grid, eta_grid) = build_grids()
@@ -422,7 +420,21 @@ for iev in iev_points:
     else:
         print "Scanning grid point", iev, "..."
         #write out the data after the cut is applied and the fit result
-        rdata = apply_cut(data, pi_grid[iev])
+
+        tree_set_temp = []
+
+        # make a new set of trees with the correct cut applied
+        for tree in tree_set:
+            tree_set_temp.append(apply_tree_cut(tree, pi_grid[iev]))
+
+        # chain all the trees with cuts applied together
+        chain = rt.TChain("Tree_HLT")
+        for ii in tree_set_temp: chain.Add(ii)
+
+        #collect the workspace and reduced data
+        (workspace,rdata) = build_workspace(chain)
+
+        #generate the fit result
         fit_result = fit_cut_dataset(data, pi_grid[iev], iev)
         
         if options.do_write:
