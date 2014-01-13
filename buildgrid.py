@@ -93,8 +93,6 @@ def apply_tree_cut(tree, cut):
     id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
 
     es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])
-    
-    print id_cut, "\n", es_cut
 
     #apply the cuts
     cut_tree_1 = tree.CopyTree(id_cut)
@@ -434,11 +432,7 @@ for iev in iev_points:
         list = rt.TList() 
         map(lambda(x):list.Add(x),tree_set_temp)
 
-        print list
-
         sum_trees = rt.TTree.MergeTrees(list)
-        print sum_trees
-
         sum_trees.SetName("Tree_HLT")
 
         #collect the workspace and reduced data
