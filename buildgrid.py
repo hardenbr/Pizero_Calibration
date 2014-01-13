@@ -98,6 +98,7 @@ def apply_tree_cut(tree, cut):
     cut_tree_1 = tree.CopyTree(id_cut)
     cut_tree_2 = cut_tree_1.CopyTree(es_cut)
 
+    print "Post Selection Events: ", cut_tree_2.GetEntries()
     return cut_tree_2
 
 def apply_cut(data, cut):
@@ -110,20 +111,20 @@ def apply_cut(data, cut):
 
 def set_values(set,tree,ii):
     set.setRealValue("mpizero",tree.STr2_mPi0_rec[ii])
-    set.setRealValue("pi_iseb",tree.STr2_Pi0recIsEB[ii]) 
-    set.setRealValue("pi_iso,",tree.STr2_IsoPi0_rec[ii])
-    set.setRealValue("pi_s4s9_1",tree.STr2_S4S9_1[ii])
-    set.setRealValue("pi_s4s9_2",tree.STr2_S4S9_2[ii])
-    set.setRealValue("pi_ncri_1",tree.STr2_n1CrisPi0_rec[ii])
-    set.setRealValue("pi_ncri_2",tree.STr2_n2CrisPi0_rec[ii])
-    set.setRealValue("pt_g1",tree.STr2_ptG1_rec[ii])
-    set.setRealValue("pt_g2",tree.STr2_ptG2_rec[ii])
-    set.setRealValue("pi_pt",tree.STr2_ptPi0_rec[ii])
-    set.setRealValue("pi_rec_eta",tree.STr2_etaPi0_rec[ii])
-    set.setRealValue("es_e1_1",tree.STr2_Es_e1_1[ii])
-    set.setRealValue("es_e1_2",tree.STr2_Es_e1_2[ii])
-    set.setRealValue("es_e2_1",tree.STr2_Es_e2_1[ii])
-    set.setRealValue("es_e2_2",tree.STr2_Es_e2_2[ii])
+#    set.setRealValue("pi_iseb",tree.STr2_Pi0recIsEB[ii]) 
+#    set.setRealValue("pi_iso,",tree.STr2_IsoPi0_rec[ii])
+#    set.setRealValue("pi_s4s9_1",tree.STr2_S4S9_1[ii])
+#    set.setRealValue("pi_s4s9_2",tree.STr2_S4S9_2[ii])
+#    set.setRealValue("pi_ncri_1",tree.STr2_n1CrisPi0_rec[ii])
+#    set.setRealValue("pi_ncri_2",tree.STr2_n2CrisPi0_rec[ii])
+#    set.setRealValue("pt_g1",tree.STr2_ptG1_rec[ii])
+#    set.setRealValue("pt_g2",tree.STr2_ptG2_rec[ii])
+#    set.setRealValue("pi_pt",tree.STr2_ptPi0_rec[ii])
+#    set.setRealValue("pi_rec_eta",tree.STr2_etaPi0_rec[ii])
+#    set.setRealValue("es_e1_1",tree.STr2_Es_e1_1[ii])
+#    set.setRealValue("es_e1_2",tree.STr2_Es_e1_2[ii])
+#    set.setRealValue("es_e2_1",tree.STr2_Es_e2_1[ii])
+#    set.setRealValue("es_e2_2",tree.STr2_Es_e2_2[ii])
 
     return set
 
@@ -137,7 +138,9 @@ def build_workspace(tree):
     workspace = rt.RooWorkspace("workspace")
 
     #declare our variables with ranges
-    variables = ["npizero[1,0,1000]","mpizero[.1., .05., .25]","pi_iseb[0,0,1]","pi_iso[0,-10,10]","pi_s4s9_1[0,0,10]","pi_s4s9_2[0,0,10]","pi_ncri_1[0,0,10]","pi_ncri_2[0,0,10]","pt_g1[0,0,20]","pt_g2[0,0,20]","es_e1_1[0,0,10]","es_e1_2[0,0,10]","es_e2_1[0,0,10]","es_e2_2[0,0,10]","pi_pt[0,0,20]","pi_rec_eta[0,-10,10]"]
+    #variables = ["npizero[1,0,1000]","mpizero[.1., .05., .25]","pi_iseb[0,0,1]","pi_iso[0,-10,10]","pi_s4s9_1[0,0,10]","pi_s4s9_2[0,0,10]","pi_ncri_1[0,0,10]","pi_ncri_2[0,0,10]","pt_g1[0,0,20]","pt_g2[0,0,20]","es_e1_1[0,0,10]","es_e1_2[0,0,10]","es_e2_1[0,0,10]","es_e2_2[0,0,10]","pi_pt[0,0,20]","pi_rec_eta[0,-10,10]"]
+    
+    variables = ["mpizero[.1., .05., .25]"]
 
     #factory all the variables
     for v in variables: workspace.factory(v)    
