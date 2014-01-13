@@ -96,7 +96,7 @@ if len(pi_grid) % gjobs != 0: npoints.append((last_job_i,last_job_f))
 #make a command for each interval in the scan
 for ii in npoints:
 	#generate the commands to run on the raw and convert to trees
-        output_name = output_dir+"res/grid_%i_%i.root" % ii
+        output_name = output_dir+"/res/grid_%i_%i.root" % ii
 	cmd = "python %s/buildgrid.py -d %s -o %s -b %i -e %i" % (output_dir, pwd+"/"+options.list , output_name, ii[0], ii[1])
         if options.GRID_VETO != "no_list": cmd += " -z %s \n" % options.GRID_VETO
         else: cmd+="\n"
