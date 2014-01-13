@@ -89,17 +89,14 @@ def cut_veto_lines(file):
 
     return out_list
 
-def apply_tree_cut(tree, cut):
+def generate_tree_cut(cut):
     id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
 
     es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])
 
-    #apply the cuts
-    cut_tree_1 = tree.CopyTree(id_cut)
-    cut_tree_2 = cut_tree_1.CopyTree(es_cut)
-
-    print "Post Selection Events: ", cut_tree_2.GetEntries()
-    return cut_tree_2
+    total_cut = "(" + id_cut + ") && (" + es_cut + ")"
+    #return the cut
+    return total_cut
 
 def apply_cut(data, cut):
     id_cut = "pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
@@ -128,10 +125,9 @@ def set_values(set,tree,ii):
 
     return set
 
-def build_workspace(tree):
-
+def build_workspace(tree,cut):
     #build a list of the tree
-    tree.Draw(">>iterlist","STr2_mPi0_rec >0","entrylist")
+    tree.Draw(">>iterlist",cut,"entrylist")
     itlist = rt.gDirectory.Get("iterlist")
     
     #build the workspace
@@ -364,7 +360,6 @@ else:
     #build the list of trees in the files
     tree_set = map(lambda(x):x.Get("Tree_HLT"), file_set)
 
-    print "ENTRIES",tree_set[0].GetEntries()
 
 #build the cut grids
 (pi_grid, eta_grid) = build_grids()
@@ -427,23 +422,22 @@ for iev in iev_points:
     if options.dataset == "no_file": break
     else:
         print "Scanning grid point", iev, "..."
+        
+        #parse the long cut string
+        cut = generate_tree_cut(pi_grid[iev])
 
-
-        #make a new list of trees with the cut applied
-        print "Applying Cuts to Trees..."
-        tree_set_temp = map(lambda(x):apply_tree_cut(x,pi_grid[iev]), tree_set)
-
-        # add all the trees with cuts applied together
+        # add all the trees together
         list = rt.TList() 
-        map(lambda(x):list.Add(x),tree_set_temp)
-
+        map(lambda(x):list.Add(x),tree_set)
         sum_trees = rt.TTree.MergeTrees(list)
         sum_trees.SetName("Tree_HLT")
 
-        #collect the workspace and reduced data
+        print "Total Events in Merged Trees", sum_trees.GetEntries()
+        
+        #build the workspace and apply the cut to the merged trees
         print "Building Workspace + RooDataset from Cut Trees..."
-        (workspace,rdata) = build_workspace(sum_trees)
-
+        (workspace,rdata) = build_workspace(sum_trees, cut)
+        
         #generate the fit result
         print "Fitting RooDataset..."
         fit_result = fit_dataset(rdata, iev)
