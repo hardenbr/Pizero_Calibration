@@ -330,12 +330,12 @@ tree_set = []
 if options.dataset == "no_file":
     #get the input file
     input_file = rt.TFile(options.filename)
+    outfile = rt.TFile(options.outfilename,"RECREATE")
+
     tree = input_file.Get("Tree_HLT")
 
     eta_b = options.ETA_BEGIN
     eta_e = options.ETA_END
-
-    outfile = rt.TFile(options.outfilename,"RECREATE")
     
     cut_string = "STr2_etaPi0_rec*STr2_etaPi0_rec > %f && STr2_etaPi0_rec*STr2_etaPi0_rec < %f && STr2_mPi0_rec >0" % (eta_b*eta_b, eta_e*eta_e)
 
