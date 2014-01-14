@@ -126,8 +126,12 @@ def set_values(set,tree,ii):
     return set
 
 def build_workspace(tree,cut):
-    #build a list of the tree
-    tree.Draw(">>iterlist",cut,"entrylist")
+    #determine the events in the tree and build an iteration list
+    nevents = tree.GetEntries()
+    nselected = tree.Draw(">>iterlist",cut,"entrylist")
+    #calculate the efficiency
+    eff = float(nevents) / float(nselected)
+
     itlist = rt.gDirectory.Get("iterlist")
     
     #build the workspace
@@ -195,14 +199,10 @@ def build_grids():
 
     return (pi_grid, eta_grid)
 
-def fit_dataset(rdata,iev):
+def fit_dataset(rdata,iev,eff):
 
     #efficiency calculation
     eff_window_cut = "mpizero > .05 && mpizero < .3"
-    
-    total_events = (rdata.reduce(eff_window_cut)).numEntries()
-    post_selection = (rdata.reduce(eff_window_cut)).numEntries()
-    eff = float(post_selection) / total_events
 
     t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
@@ -436,11 +436,11 @@ for iev in iev_points:
         
         #build the workspace and apply the cut to the merged trees
         print "Building Workspace + RooDataset from Cut Trees..."
-        (workspace,rdata) = build_workspace(sum_trees, cut)
+        (workspace,rdata,eff) = build_workspace(sum_trees, cut,eff)
         
         #generate the fit result
         print "Fitting RooDataset..."
-        fit_result = fit_dataset(rdata, iev)
+        fit_result = fit_dataset(rdata, iev,eff)
         
         if options.do_write:
             rdata.Write("tree_%i" % iev)
