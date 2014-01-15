@@ -368,7 +368,7 @@ print "Number of grid points for pizero:",  len(pi_grid)
 
 rdata = None
 #output file containing fits and canvases
-if options.do_write: output = rt.TFile(options.outfilename,"RECREATE")
+output = rt.TFile(options.outfilename,"RECREATE")
 
 #output files containing cut values and fit calculations
 outfile_dir = options.outfilename[:-5]
@@ -474,5 +474,5 @@ for iev in iev_points:
 if options.do_write:
     workspace.Write()
     output.Close()
-
+    
 
