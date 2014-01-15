@@ -89,12 +89,14 @@ def cut_veto_lines(file):
 
     return out_list
 
+#DEPRECATED
 def generate_tree_cut(cut):
-    id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
+    id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])        
 
-    es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])
+    es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])    
 
     total_cut = "(" + id_cut + ") && (" + es_cut + ")"
+
     #return the cut
     return total_cut
 
@@ -125,14 +127,11 @@ def set_values(set,tree,ii):
 
     return set
 
-def build_workspace(tree,cut):
+def build_workspace(tree,cut,grid_point):
     #determine the events in the tree and build an iteration list
-    nevents = tree.GetEntries()
-    nselected = tree.Draw(">>iterlist",cut,"entrylist")
-    #calculate the efficiency
-    eff = float(nevents) / float(nselected)
+    nevents = tree.Draw(">>iterlist_%i" % grid_point , "", "entrylist")
 
-    itlist = rt.gDirectory.Get("iterlist")
+    itlist = rt.gDirectory.Get("iterlist_%i" % grid_point)
     
     #build the workspace
     workspace = rt.RooWorkspace("workspace")
@@ -150,6 +149,7 @@ def build_workspace(tree,cut):
     data = rt.RooDataSet('PiTree','Tree of Pi0/Eta Information',args)
 
     iev = 0
+    nselected = 0
     #loop over the tree and add it to the RooDataSet
     while iev < tree.GetEntries():
         if iev % 1000 == 0: print "Filling Tree...",iev
@@ -163,12 +163,31 @@ def build_workspace(tree,cut):
         #set the RooArgSet and save                                                          
         a = rt.RooArgSet(args)
 
-        # for each reconstructed pion, add its values to the dataset
-        for ii in range(tree.STr2_NPi0_rec): data.add(set_values(a,tree,ii))    
+        # for each reconstructed pion, check if it passes cut and add to dataset
+        for jj in range(tree.STr2_NPi0_rec): 
 
-    getattr(workspace,'import')(data)    
+            pt_cut = tree.STr2_ptG1_rec[jj] > cut[0] and tree.STr2_ptG2_rec[jj] > cut[0]
+            pt_pi_cut = tree.STr2_ptPi0_rec[jj] > cut[1] 
+            s4s9 = tree.STr2_S4S9_1[jj] > cut[3] and tree.STr2_S4S9_2[jj] > cut[3]
+            iso = tree.STr2_IsoPi0_rec[jj] > cut[4] 
+            ncrys = tree.STr2_n1CrisPi0_rec[jj] > cut[5] and tree.STr2_n2CrisPi0_rec[jj] > cut[6]
+            es_cut = ((tree.STr2_Es_e1_1[jj] + tree.STr2_Es_e2_1[jj]) > cut[2] and \
+                (tree.STr2_Es_e1_2[jj] + tree.STr2_Es_e2_2[jj]) > cut[2]) or tree.STr2_Pi0recIsEB[jj]
+#            print tree.STr2_ptG1_rec[0],tree.STr2_ptG1_rec[1] 
+#            print pt_cut, pt_pi_cut, s4s9, iso, ncrys, es_cut
 
-    return (workspace,data)
+
+            if (pt_cut and pt_pi_cut and s4s9 and iso and ncrys and es_cut):
+                nselected+=1
+                temp = set_values(a,tree,jj)
+                data.add(temp)
+
+    #calculate the efficiency
+    eff = float(nselected) / float(nevents)
+
+    #deprecated
+    #getattr(workspace,'import')(data)    
+    return (workspace, data, eff)
 
 def build_grids():
     #cystals scan range
@@ -206,7 +225,7 @@ def fit_dataset(rdata,iev,eff):
 
     t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
-    mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .12, .135,"GeV")
+    mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .11, .135,"GeV")
     sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .013, .011, .0145,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
     
@@ -325,6 +344,8 @@ def fit_dataset(rdata,iev,eff):
 #################
 
 tree_set = []
+sum_trees = None
+output = None
 
 #build the data workspace if there is no rooDatasets Specified
 if options.dataset == "no_file":
@@ -361,14 +382,13 @@ else:
     tree_set = map(lambda(x):x.Get("Tree_HLT"), file_set)
 
 
+
 #build the cut grids
 (pi_grid, eta_grid) = build_grids()
 
 print "Number of grid points for pizero:",  len(pi_grid)
 
 rdata = None
-#output file containing fits and canvases
-if options.do_write: output = rt.TFile(options.outfilename,"RECREATE")
 
 #output files containing cut values and fit calculations
 outfile_dir = options.outfilename[:-5]
@@ -417,6 +437,16 @@ if veto_list != "no_list":
 
     print "Now...",len(iev_points),"points remaining"
 
+#output file containing fits and canvases
+if options.do_write: 
+    output = rt.TFile(options.outfilename,"RECREATE")
+
+# add all the trees together
+list = rt.TList() 
+for tree in tree_set: list.Add(tree)
+sum_trees = rt.TTree.MergeTrees(list)
+sum_trees.SetName("Tree_HLT")
+
 #scan point by point
 for iev in iev_points:    
     if options.dataset == "no_file": break
@@ -424,25 +454,20 @@ for iev in iev_points:
         print "Scanning grid point", iev, "..."
         
         #parse the long cut string
-        cut = generate_tree_cut(pi_grid[iev])
-
-        # add all the trees together
-        list = rt.TList() 
-        map(lambda(x):list.Add(x),tree_set)
-        sum_trees = rt.TTree.MergeTrees(list)
-        sum_trees.SetName("Tree_HLT")
+        cut = pi_grid[iev]
 
         print "Total Events in Merged Trees", sum_trees.GetEntries()
         
         #build the workspace and apply the cut to the merged trees
         print "Building Workspace + RooDataset from Cut Trees..."
-        (workspace,rdata,eff) = build_workspace(sum_trees, cut,eff)
+        (workspace,rdata,eff) = build_workspace(sum_trees, cut, iev)
         
         #generate the fit result
         print "Fitting RooDataset..."
-        fit_result = fit_dataset(rdata, iev,eff)
+        fit_result = fit_dataset(rdata, iev, eff)
         
         if options.do_write:
+            #sum_trees.Write("ttree_%i" % iev)
             rdata.Write("tree_%i" % iev)
             #write the result
             fit_result[0].Write("fit_%i" % iev) 
