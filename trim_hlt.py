@@ -26,7 +26,9 @@ parser.add_option("--eta_e", dest="ETA_END",
 
 def parse_array(vector,npizero):
     temp = []
-    for ii in range(npizero): temp.append(vector[ii])
+    for ii in range(npizero): 
+        temp.append(vector[ii])
+
     return temp
 
 def parse_idx(eta_b,eta_e, eta_val):
@@ -41,6 +43,7 @@ def parse_idx(eta_b,eta_e, eta_val):
 def parse_elem(idx, list):
     temp = []
     for ii in idx: temp.append(list[ii])
+
     return temp
 
 file = rt.TFile(options.filename)
@@ -105,6 +108,7 @@ while iev < tree.GetEntries():
 
     #produce python arrays from arrays contained inside the trees
     npiz = tree.STr2_NPi0_rec
+
     is_eb = parse_array(tree.STr2_Pi0recIsEB, npiz)
     iso = parse_array(tree.STr2_IsoPi0_rec, npiz)
     ncri1 = parse_array(tree.STr2_n1CrisPi0_rec, npiz)

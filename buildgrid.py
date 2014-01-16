@@ -152,7 +152,7 @@ def build_workspace(tree,cut,grid_point):
     nselected = 0
     #loop over the tree and add it to the RooDataSet
     while iev < tree.GetEntries():
-        if iev % 1000 == 0: print "Filling Tree...",iev
+        if iev % 5000 == 0: print "Filling Tree...",iev
         iev += 1
         entry = itlist.Next()
 
@@ -172,9 +172,7 @@ def build_workspace(tree,cut,grid_point):
             iso = tree.STr2_IsoPi0_rec[jj] > cut[4] 
             ncrys = tree.STr2_n1CrisPi0_rec[jj] > cut[5] and tree.STr2_n2CrisPi0_rec[jj] > cut[6]
             es_cut = ((tree.STr2_Es_e1_1[jj] + tree.STr2_Es_e2_1[jj]) > cut[2] and \
-                (tree.STr2_Es_e1_2[jj] + tree.STr2_Es_e2_2[jj]) > cut[2]) or tree.STr2_Pi0recIsEB[jj]
-#            print tree.STr2_ptG1_rec[0],tree.STr2_ptG1_rec[1] 
-#            print pt_cut, pt_pi_cut, s4s9, iso, ncrys, es_cut
+                (tree.STr2_Es_e1_2[jj] + tree.STr2_Es_e2_2[jj]) > cut[2])
 
 
             if (pt_cut and pt_pi_cut and s4s9 and iso and ncrys and es_cut):
