@@ -12,6 +12,16 @@ parser.add_option("-o", "--outfile", dest="outfilename",
                   help="tree.root file name to output",default="datatree.root",
                   action="store",type="string")
 
+parser.add_option("--eta_b", dest="ETA_BEGIN",
+                  help="minimum of eta range. This is only to be used for the dataset conversion i.e. the -f flag",
+                  action="store",type="float",default=0)
+
+parser.add_option("--eta_e", dest="ETA_END",
+                  help="maximum of eta range.  This is only to be used for the dataset conversion i.e. the -f flag",
+                  action="store",type="float",default=1000)
+
+
+
 (options, args) = parser.parse_args()
 
 def parse_array(vector,npizero):
@@ -116,7 +126,7 @@ while iev < tree.GetEntries():
     arrays = [is_eb,iso,ncri1, ncri2, mpiz, ptg1, ptg2, eta, ptpi0, drg1g2, ese1_1, ese2_1, ese1_2, ese2_2, s4s9_1, s4s9_2]
 
     #parse the indices of pizeros with eta in the correct regions
-    idx = parse_idx(1.7,2.5,eta)
+    idx = parse_idx(options.ETA_BEGIN, options.ETA_END, eta)
 
     #keep only the elements passing eta cuts
     for ii in range(len(arrays)): arrays[ii] = parse_elem(idx, arrays[ii])
