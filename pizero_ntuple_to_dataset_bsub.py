@@ -56,7 +56,7 @@ os.system("mkdir " + output_dir)
 os.system("mkdir " + output_dir+"/logs")
 os.system("mkdir " + output_dir+"/src")
 os.system("mkdir " + output_dir+"/res")
-os.system("cp %s/buildgrid.py %s" % (pwd,output_dir))
+os.system("cp %s/trim_hlt.py %s" % (pwd,output_dir))
 #add the style file
 os.system("cp %s/rootlogon.py %s/" % (pwd,output_dir))
 
@@ -75,9 +75,10 @@ for ii in range(n_file):
 	#if the eta range is specified pass this to buildgrid and change the output name of the file
 	if eta_b != 0 or eta_e < 10:
 		output_name = output_name[:-5]+ "_%3.0f_%3.0f.root" % (eta_b*100,eta_e*100)
-		cmd = "python %s/buildgrid.py -w -f %s -o %s --eta_b %f --eta_e %f \n" % (output_dir, files[ii], output_name, eta_b, eta_e)
+		cmd = "python %s/trim_hlt.py -f %s -o %s --eta_b %f --eta_e %f \n" % (output_dir, files[ii], output_name, eta_b, eta_e)
 	else:
-		cmd = "python %s/buildgrid.py -w -f %s -o %s \n" % (output_dir, files[ii], output_name)
+		cmd = ""
+		print "WHY ARE YOU NOT TRIMMING IN ETA???"
 
 	commands.append(cmd)
 

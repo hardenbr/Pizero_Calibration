@@ -33,7 +33,7 @@ def parse_idx(eta_b,eta_e, eta_val):
     good_idx = []
 
     for ii in range(len(eta_val)):
-        if eta_val[ii] > eta_b and eta_val[ii] < eta_e:
+        if abs(eta_val[ii]) > eta_b and abs(eta_val[ii]) < eta_e:
             good_idx.append(ii)
 
     return good_idx
@@ -150,8 +150,7 @@ while iev < tree.GetEntries():
         pizeros.STr2_Es_e2_2 = array.array("f",arrays[13])
         pizeros.STr2_S4S9_1 = array.array("f",arrays[14])
         pizeros.STr2_S4S9_2 = array.array("f",arrays[15])
-
-    out_tree.Fill()
+        out_tree.Fill()
  
 out_tree.Write()
 out_file.Close()
