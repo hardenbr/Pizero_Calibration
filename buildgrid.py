@@ -175,8 +175,7 @@ def build_workspace(tree,cut,grid_point):
                 (tree.STr2_Es_e1_2[jj] + tree.STr2_Es_e2_2[jj]) > cut[2])
 
 
-#            if (pt_cut and pt_pi_cut and s4s9 and iso and ncrys and es_cut):
-            if True:
+            if (pt_cut and pt_pi_cut and s4s9 and iso and ncrys and es_cut):
                 nselected+=1
                 temp = set_values(a,tree,jj)
                 data.add(temp)
