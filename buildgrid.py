@@ -97,9 +97,9 @@ def generate_tree_cut(cut):
 
     total_cut = "(" + id_cut + ") && (" + es_cut + ")"
 
-    #return the cut
     return total_cut
 
+#DEPRECATED
 def apply_cut(data, cut):
     id_cut = "pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])    
 #    id_cut = "mpizero < %f && pt_g1 > %f && pt_g2 > %f && pi_pt > %f && pi_s4s9_1 > %f && pi_s4s9_2 > %f && pi_iso < %f && pi_ncri_1 > %i && pi_ncri_2 > %i" % (.25,1 , 1, 1.5, .7, .7, .3, 7, 5)    
@@ -169,13 +169,14 @@ def build_workspace(tree,cut,grid_point):
             pt_cut = tree.STr2_ptG1_rec[jj] > cut[0] and tree.STr2_ptG2_rec[jj] > cut[0]
             pt_pi_cut = tree.STr2_ptPi0_rec[jj] > cut[1] 
             s4s9 = tree.STr2_S4S9_1[jj] > cut[3] and tree.STr2_S4S9_2[jj] > cut[3]
-            iso = tree.STr2_IsoPi0_rec[jj] > cut[4] 
+            iso = tree.STr2_IsoPi0_rec[jj] < cut[4] 
             ncrys = tree.STr2_n1CrisPi0_rec[jj] > cut[5] and tree.STr2_n2CrisPi0_rec[jj] > cut[6]
             es_cut = ((tree.STr2_Es_e1_1[jj] + tree.STr2_Es_e2_1[jj]) > cut[2] and \
                 (tree.STr2_Es_e1_2[jj] + tree.STr2_Es_e2_2[jj]) > cut[2])
 
 
-            if (pt_cut and pt_pi_cut and s4s9 and iso and ncrys and es_cut):
+#            if (pt_cut and pt_pi_cut and s4s9 and iso and ncrys and es_cut):
+            if True:
                 nselected+=1
                 temp = set_values(a,tree,jj)
                 data.add(temp)
@@ -224,7 +225,7 @@ def fit_dataset(rdata,iev,eff):
     t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .11, .135,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .013, .011, .0145,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .013, .011, .02,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
     
     #build the background from a polynomial
@@ -237,12 +238,12 @@ def fit_dataset(rdata,iev,eff):
     c6 = rt.RooRealVar("c6","c6",.3,-1,1)
 
     #using a polynomial background
-    bkg_pars = rt.RooArgList(c0,c1,c2)
+    bkg_pars = rt.RooArgList(c0,c1,c2,c3)
     bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
     
     #add the signal and the background in a model
-    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",1001,1000,3000)
-    n_bkg = rt.RooRealVar("nbkg","background yield",2000,100, 1e5)
+    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",5000,1000,5e4)
+    n_bkg = rt.RooRealVar("nbkg","background yield",2000,100, 1e6)
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
     
@@ -385,7 +386,7 @@ else:
 (pi_grid, eta_grid) = build_grids()
 
 print "Number of grid points for pizero:",  len(pi_grid)
-
+print generate_tree_cut(pi_grid[37195])
 rdata = None
 
 #output file containing fits and canvases
@@ -457,11 +458,19 @@ for iev in iev_points:
         
         #build the workspace and apply the cut to the merged trees
         print "Building Workspace + RooDataset from Cut Trees..."
+
         (workspace,rdata,eff) = build_workspace(sum_trees, cut, iev)
         
+        print "Checking Efficiency...",
+
+        fit_result = None
+        if eff < .01:
+            fit_result = None
+            print "Bad Efficiency...not fitting"
+        else:
+            print "Good Efficiency..Fitting..."
         #generate the fit result
-        print "Fitting RooDataset..."
-        fit_result = fit_dataset(rdata, iev, eff)
+            fit_result = fit_dataset(rdata, iev, eff)
         
         if options.do_write:
             #sum_trees.Write("ttree_%i" % iev)
@@ -482,10 +491,11 @@ for iev in iev_points:
         fit_params_string += "@@%i \t" % iev
         if iev <= 9999: fit_params_string += "\t" 
 
-        #format the result
-        for jj in fit_result[2:]:
-            if jj > 10: fit_params_string+="%6.1f\t" % jj
-            else:  fit_params_string+="%2.5f\t" % jj
+        #format the result if there was a fit result
+        if fit_result != None:
+            for jj in fit_result[2:]:
+                if jj > 10: fit_params_string+="%6.1f\t" % jj
+                else:  fit_params_string+="%2.5f\t" % jj
         fit_params_string+="\n"
 
     print "\n"
