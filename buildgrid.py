@@ -470,14 +470,13 @@ for iev in iev_points:
             print "Good Efficiency..Fitting..."
         #generate the fit result
             fit_result = fit_dataset(rdata, iev, eff)
-        
-        if options.do_write:
-            #sum_trees.Write("ttree_%i" % iev)
-            rdata.Write("tree_%i" % iev)
-            #write the result
-            fit_result[0].Write("fit_%i" % iev) 
-            #write the frame
-            fit_result[1].Write("frame_%i" % iev)
+            if options.do_write:
+                #sum_trees.Write("ttree_%i" % iev)
+                rdata.Write("tree_%i" % iev)
+                #write the result
+                fit_result[0].Write("fit_%i" % iev) 
+                #write the frame
+                fit_result[1].Write("frame_%i" % iev)
 
         #write out the values of the cuts  
         #make sure tabbing is correct for output  
@@ -493,8 +492,10 @@ for iev in iev_points:
         #format the result if there was a fit result
         if fit_result != None:
             for jj in fit_result[2:]:
-                if jj > 10: fit_params_string+="%6.1f\t" % jj
-                else:  fit_params_string+="%2.5f\t" % jj
+                if jj > 10: fit_params_string+="%.3g\t" % jj
+                else:  fit_params_string+="%.3g\t" % jj
+        else:
+            fit_params_string+="NO_RESULT\t"
         fit_params_string+="\n"
 
     print "\n"

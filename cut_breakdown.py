@@ -74,7 +74,7 @@ baseline_cut = "STr2_mPi0_rec > .05 && STr2_mPi0_rec < .3"
 ncri1_cut = "STr2_n1CrisPi0_rec > %i" % cut[5]
 ncri2_cut = "STr2_n2CrisPi0_rec > %i" % cut[6]
 ptclus_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f" % ( cut[0],cut[0],cut[1])
-layer_cut = "((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])    
+layer_cut = "((STr2_Es_e1_1 + STr2_Es_e2_1) > %f  && (STr2_Es_e1_2 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])    
 s4s9_cut = "STr2_S4S9_1 > %f && STr2_S4S9_2 > %f" % (cut[3], cut[3])
 
 list_cuts = [ncri1_cut, ncri2_cut, ptclus_cut, layer_cut, s4s9_cut]
@@ -104,7 +104,7 @@ tree.Draw("STr2_mPi0_rec>>h3",prog_cuts[3])
 tree.Draw("STr2_mPi0_rec>>h4",prog_cuts[4])
 tree.Draw("STr2_mPi0_rec>>h5",prog_cuts[5])
 
-
+#print prog_cuts
 colors = [rt.kGray,rt.kOrange, rt.kGreen,rt.kViolet,rt.kPink,rt.kBlue]
 legend = rt.TLegend(.415,.394,.86,.738)
 legend.SetFillColor(0)
@@ -120,6 +120,17 @@ for ii in range(len(hist_list)):
     legend.AddEntry(hist_list[ii],names[ii],"f")
 
 
+print "cut \t nevents"
+print "nocut \t", int(nocut_hist.GetEntries()), "\t %.4f" % 1.0
+print "ncri1\t", int(ncri1_hist.GetEntries()), "\t %.4f" % (float(ncri1_hist.GetEntries()) / nocut_hist.GetEntries())
+print "ncri2\t", int(ncri2_hist.GetEntries()), "\t %.4f" % (float(ncri2_hist.GetEntries()) / nocut_hist.GetEntries())
+print "ptclus\t", int(ptclus_hist.GetEntries()), "\t %.4f"% (float(ptclus_hist.GetEntries()) / nocut_hist.GetEntries())
+print "elayer\t", int(layer_hist.GetEntries()), "\t %.4f" % (float(layer_hist.GetEntries()) / nocut_hist.GetEntries())
+print "s4s9\t", int(s4_s9_hist.GetEntries()), "\t %.4f" % (float(s4_s9_hist.GetEntries()) / nocut_hist.GetEntries())
+
 legend.Draw("same")
+
+
+print prog_cuts[-1]
 
 raw_input("")
