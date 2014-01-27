@@ -124,7 +124,7 @@ while iev < tree.GetEntries():
     ese1_2 = parse_array( tree.STr2_Es_e1_2, npiz)
     ese2_2 = parse_array( tree.STr2_Es_e2_2, npiz)
     s4s9_1 = parse_array(tree.STr2_S4S9_1, npiz)
-    s4s9_2 = parse_array(tree.STr2_S4S9_1, npiz)
+    s4s9_2 = parse_array(tree.STr2_S4S9_2, npiz)
 
     #make alist of the arrays to iterate over
     arrays = [is_eb,iso,ncri1, ncri2, mpiz, ptg1, ptg2, eta, ptpi0, drg1g2, ese1_1, ese2_1, ese1_2, ese2_2, s4s9_1, s4s9_2]
