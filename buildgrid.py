@@ -129,7 +129,7 @@ def set_values(set,tree,ii):
 
 def build_workspace(tree,cut,grid_point):
     #determine the events in the tree and build an iteration list
-    nevents = tree.Draw(">>iterlist_%i" % grid_point , "", "entrylist")
+    tree.Draw(">>iterlist_%i" % grid_point , "", "entrylist")
 
     itlist = rt.gDirectory.Get("iterlist_%i" % grid_point)
     
@@ -150,6 +150,8 @@ def build_workspace(tree,cut,grid_point):
 
     iev = 0
     nselected = 0
+    ntotal = 0
+
     #loop over the tree and add it to the RooDataSet
     while iev < tree.GetEntries():
         if iev % 5000 == 0: print "Filling Tree...",iev
@@ -163,6 +165,7 @@ def build_workspace(tree,cut,grid_point):
         #set the RooArgSet and save                                                          
         a = rt.RooArgSet(args)
 
+        ntotal += tree.STr2_NPi0_rec
         # for each reconstructed pion, check if it passes cut and add to dataset
         for jj in range(tree.STr2_NPi0_rec): 
 
@@ -181,7 +184,7 @@ def build_workspace(tree,cut,grid_point):
                 data.add(temp)
 
     #calculate the efficiency
-    eff = float(nselected) / float(nevents)
+    eff = float(nselected) / float(ntotal)
 
     #deprecated
     #getattr(workspace,'import')(data)    
