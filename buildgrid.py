@@ -95,7 +95,8 @@ def generate_tree_cut(cut):
 
     es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])    
 
-    total_cut = "(" + id_cut + ") && (" + es_cut + ")"
+#    total_cut = "(" + id_cut + ") && (" + es_cut + ")"
+    total_cut = "(" + id_cut + ")"
 
     return total_cut
 
@@ -127,8 +128,12 @@ def set_values(set,tree,ii):
 
     return set
 
+
+
 def build_workspace(tree,cut,grid_point):
     #determine the events in the tree and build an iteration list
+
+
     tree.Draw(">>iterlist_%i" % grid_point , "", "entrylist")
 
     itlist = rt.gDirectory.Get("iterlist_%i" % grid_point)
@@ -190,10 +195,45 @@ def build_workspace(tree,cut,grid_point):
     #getattr(workspace,'import')(data)    
     return (workspace, data, eff)
 
+def build_workspace_hist(tree,cut,grid_point):
+    #determine the events in the tree and build an iteration list
+    hist_total = rt.TH1F("datahist_total","datahist_total",100,.05,.25)
+    hist = rt.TH1F("datahist","datahist",100,.05,.25)
+
+    cut_string = generate_tree_cut(cut)
+    tree.Draw("STr2_mPi0_rec>>datahist",cut_string)
+    tree.Draw("STr2_mPi0_rec>>datahist_total")
+    
+    #build the workspace
+    workspace = rt.RooWorkspace("workspace")
+
+    #declare our variables with ranges
+    #variables = ["npizero[1,0,1000]","mpizero[.1., .05., .25]","pi_iseb[0,0,1]","pi_iso[0,-10,10]","pi_s4s9_1[0,0,10]","pi_s4s9_2[0,0,10]","pi_ncri_1[0,0,10]","pi_ncri_2[0,0,10]","pt_g1[0,0,20]","pt_g2[0,0,20]","es_e1_1[0,0,10]","es_e1_2[0,0,10]","es_e2_1[0,0,10]","es_e2_2[0,0,10]","pi_pt[0,0,20]","pi_rec_eta[0,-10,10]"]
+    
+    variables = ["mpizero[.1., .05., .25]"]
+
+    #factory all the variables
+    for v in variables: workspace.factory(v)    
+
+    #make the RooDataset
+    args = workspace.allVars()
+    data = rt.RooDataSet('PiTree','Tree of Pi0/Eta Information',args)
+
+    iev = 0
+    nselected = 0
+    ntotal = 0
+
+    #loop over the tree and add it to the RooDataSet
+
+    #calculate the efficiency
+    eff = float(hist.GetEntries())/ float(hist_total.GetEntries())
+
+    return (workspace, hist, eff)
+
 def build_grids():
     #cystals scan range
-    ncri1 = range(4,7)
-    ncri2 = range(4,7)
+    ncri1 = range(0,3)
+    ncri2 = range(0,3)
 
     #pizero scan range
     pi_cluster_pt = np.linspace(.4,1,4)
@@ -221,14 +261,13 @@ def build_grids():
 
 def fit_dataset(rdata,iev,eff):
 
-    #efficiency calculation
-    eff_window_cut = "mpizero > .05 && mpizero < .3"
-
-    t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .11, .135,"GeV")
     sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .013, .011, .02,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
+
+    #t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
+    t1 = rt.RooDataHist("dh","#gamma#gamma invariant mass", rt.RooArgList(x), rdata)
     
     #build the background from a polynomial
     c0 = rt.RooRealVar("c0","c0",.2,-1,1)
@@ -244,8 +283,10 @@ def fit_dataset(rdata,iev,eff):
     bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
     
     #add the signal and the background in a model
-    n_sig = rt.RooRealVar("nsig","#pi^{0} yield",5000,1000,5e4)
-    n_bkg = rt.RooRealVar("nbkg","background yield",2000,100, 1e6)
+    tot = rdata.GetEntries()
+
+    n_sig = rt.RooRealVar("nsig","#pi^{0} yield", tot*.2,tot*.05, tot*.3)
+    n_bkg = rt.RooRealVar("nbkg","background yield",tot*.9, tot*.2, tot*.9)
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
     
@@ -461,7 +502,7 @@ for iev in iev_points:
         #build the workspace and apply the cut to the merged trees
         print "Building Workspace + RooDataset from Cut Trees..."
 
-        (workspace,rdata,eff) = build_workspace(sum_trees, cut, iev)
+        (workspace,rdata,eff) = build_workspace_hist(sum_trees, cut, iev)
         
         print "Checking Efficiency...",
 
@@ -498,7 +539,7 @@ for iev in iev_points:
                 if jj > 1000: fit_params_string+="%.1g\t" % jj
                 else:  fit_params_string+="%.2g\t" % jj
         else:
-            fit_params_string+="NO_RESULT\t"
+            fit_params_string+="NO_RESULT EFFICIENCY TOO LOW eff=%f" % eff
         fit_params_string+="\n"
 
     print "\n"
