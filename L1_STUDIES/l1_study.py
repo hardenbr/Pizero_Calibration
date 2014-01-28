@@ -21,6 +21,7 @@ RooFit.PrintLevel(-1)
 RooFit.Verbose(False)
 rt.RooMsgService.instance().setGlobalKillBelow(RooFit.WARNING)
 
+N_TRIGGERS = 128
 
 parser = OptionParser()
 
@@ -45,16 +46,11 @@ parser.add_option("-w","--write", dest="do_write", help="write the fits and canv
 
 (options, args) = parser.parse_args()
 
-#parser.print_help()
+parser.print_help()
 
-#cut the numbers out of a result file
-def generate_tree_cut(cut):
+def get_hlt_hists(tree):
+    print "Producting histograms for each bit"
 
-    total_cut = "(" + id_cut + ")"
-
-    return total_cut
-
-def get_hlt_arrays(tree)
     #determine the events in the tree and build an iteration list
 
     tree.Draw(">>iterlist", "", "entrylist")
@@ -67,34 +63,55 @@ def get_hlt_arrays(tree)
     iev = 0
 
     l1_trig_idx = []
+    l1_uniq_hists = []
+    l1_raw_hists = []
+
+    for ii in range(N_TRIGGERS):
+        u_hist = rt.TH1F("u_hist_%i" % ii,"u_hist_%i" % ii, 100, .05, .25) 
+        r_hist = rt.TH1F("r_hist_%i" % ii,"r_hist_%i" % ii, 100, .05, .25) 
+
+        l1_uniq_hists.append(u_hist)
+        l1_raw_hists.append(r_hist)
+
     #loop over the tree and add it to the RooDataSet
     while iev < tree.GetEntries():
-        if iev % 5000 == 0: print "Filling L1...",iev
+        if iev % 5000 == 0: print "Filling L1 at event...",iev
         iev += 1
         entry = itlist.Next()
         
         #set the RooArgSet and save                                                          
         a = rt.RooArgSet(args)
 
-        ntotal += tree.STr2_NPi0_rec
-        # for each reconstructed pion, check if it passes cut and add to dataset
+        l1bits = tree.L1bits        
+        sum_bits = sum(l1bits)
 
-        l1bits = tree.L1bits
-        
-        idx_list = []
-        for l1 in range(len(l1bits)): if l1bits[l1] == 1: idx_list.append(l1)
+        #if it is uniq
+        if sum_bits == 1:
+            #find the uniq bit
+            for il1 in range(len(l1bits)):                 
+                if l1bits[il1] == 1: 
+                    for ipi in range(tree.STr2_NPi0_rec): 
+                        l1_uniq_hists[il1].Fill(tree.STr2_mPi0_rec)
+                        l1_raw_hists[il1].Fill(tree.STr2_mPi0_rec)
+                    break #we are done once we find the first one
+        #if it is raw
+        else:
+            found_bits = 0
+            for il1 in range(len(l1bits)):                 
+                if l1bits[il1] == 1: 
+                    sum_bits += 1
+                    for ipi in range(tree.STr2_NPi0_rec): 
+                        l1_raw_hists[il1].Fill(tree.STr2_mPi0_rec)
+                if found_bits = sum_bits: break #we found them all
 
-        l1_trig_idx.append(idx_list)
+    return (l1_raw_hists, l1_uniq_hists)
 
-    return l1_trig_idx
-
-
-def build_workspace_hist(tree,cut,grid_point):
+def build_workspace_hist(tree,cut,l1num):
     #determine the events in the tree and build an iteration list
     hist_total = rt.TH1F("datahist_total","datahist_total",100,.05,.25)
     hist = rt.TH1F("datahist","datahist",100,.05,.25)
 
-    cut_string = generate_tree_cut(cut)
+    cut_string = ""
     tree.Draw("STr2_mPi0_rec>>datahist",cut_string)
     tree.Draw("STr2_mPi0_rec>>datahist_total")
     
@@ -111,18 +128,12 @@ def build_workspace_hist(tree,cut,grid_point):
     args = workspace.allVars()
     data = rt.RooDataSet('PiTree','Tree of Pi0/Eta Information',args)
 
-    iev = 0
-    nselected = 0
-    ntotal = 0
-
-    #loop over the tree and add it to the RooDataSet
-
     #calculate the efficiency
     eff = float(hist.GetEntries())/ float(hist_total.GetEntries())
 
     return (workspace, hist, eff)
 
-def fit_dataset(rdata,iev,eff):
+def fit_dataset(rdata,il1,eff):
 
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .11, .135,"GeV")
@@ -177,7 +188,7 @@ def fit_dataset(rdata,iev,eff):
     bkg_scale = (normBkg_sob / normBkg_full)
 
     #put the frame on a canvas
-    canvas = rt.TCanvas("canvas_%i" % iev)
+    canvas = rt.TCanvas("canvas_%i" % il1)
 
     #make a frame
     frame = x.frame()
@@ -233,7 +244,7 @@ def fit_dataset(rdata,iev,eff):
     line2 = "reduced #chi^{2}: %.4f" % chi2
     line3 = "#mu: %.4f, #sigma: %.4f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
     line4 = "Efficiency %.6f" % eff
-    line5 = "Grid #: %i" % iev
+    line5 = "Grid #: %i" % il1
     
     lat.DrawLatex(xmin,ymin,line)
     lat.DrawLatex(xmin,ymin-ypass,line2)
@@ -264,10 +275,6 @@ temp_file = None
 file_set = map(lambda(x):rt.TFile(x),dataset_file_lines_stripped)
 #build the list of trees in the files
 tree_set = map(lambda(x):x.Get("Tree_HLT"), file_set)
-
-
-print "Number of grid points for pizero:",  len(pi_grid)
-
 rdata = None
 
 #output file containing fits and canvases
@@ -279,32 +286,40 @@ outfile_dir = options.outfilename[:-5]
 fit_params_string = "@GRID#\t\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
 cut_string = "@grid#\t\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n"
 
+list = rt.TList() 
+for tree in tree_set: list.Add(tree)
+sum_trees = rt.TTree.MergeTrees(list)
+sum_trees.SetName("Tree_HLT")
+
+
+(raw_hists, uniq_hists) = get_hlt_hists(sum_trees))
+
 #scan point by point
-for il in il1_points:    
+for il1 in range(N_TRIGGERS)
+    print "Scanning L1 Bit:", il1
 
+    uniq_data = uniq_hists[il1]
+    raw_data = raw_hists[il1]
 
-    (workspace,rdata,eff) = build_workspace_hist(sum_trees, cut, iev)
-        
-    print "Checking Efficiency...",
-
-
-    if eff < .01:
+    if raw_data.GetEntries() == 0:
         fit_result = None
-        print "Bad Efficiency...not fitting"
+        print "...not fitting.."
     else:
-        print "Good Efficiency..Fitting..."
+        print "...Fitting..."
+
         #generate the fit result
-        fit_result = fit_dataset(rdata, iev, eff)
+        fit_result = fit_dataset(rdata, il1, eff)
+
         if options.do_write:
             #sum_trees.Write("ttree_%i" % iev)
-            rdata.Write("tree_%i" % iev)
+            rdata.Write("tree_%i" % il1)
             #write the result
-            fit_result[0].Write("fit_%i" % iev) 
+            fit_result[0].Write("fit_%i" % il1) 
             #write the frame
-            fit_result[1].Write("frame_%i" % iev)
+            fit_result[1].Write("frame_%i" % il1)
 
         #make sure tabbing is correct for output
-        fit_params_string += "@@%i \t" % iev
+        fit_params_string += "@@%i \t" % il1
         if iev <= 9999: fit_params_string += "\t" 
 
         #format the result if there was a fit result
