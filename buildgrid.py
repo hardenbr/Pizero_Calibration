@@ -175,7 +175,7 @@ def build_workspace(tree,cut,grid_point):
                 (tree.STr2_Es_e1_2[jj] + tree.STr2_Es_e2_2[jj]) > cut[2])
 
 
-            if (pt_cut and pt_pi_cut and s4s9 and iso and ncrys and es_cut):
+            if (pt_cut and pt_pi_cut and s4s9 and iso and ncrys):
                 nselected+=1
                 temp = set_values(a,tree,jj)
                 data.add(temp)
@@ -189,7 +189,7 @@ def build_workspace(tree,cut,grid_point):
 
 def build_grids():
     #cystals scan range
-    ncri1 = range(4,9)
+    ncri1 = range(4,7)
     ncri2 = range(4,7)
 
     #pizero scan range
@@ -237,7 +237,7 @@ def fit_dataset(rdata,iev,eff):
     c6 = rt.RooRealVar("c6","c6",.3,-1,1)
 
     #using a polynomial background
-    bkg_pars = rt.RooArgList(c0,c1,c2,c3)
+    bkg_pars = rt.RooArgList(c0,c1,c2)
     bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
     
     #add the signal and the background in a model
@@ -385,7 +385,7 @@ else:
 (pi_grid, eta_grid) = build_grids()
 
 print "Number of grid points for pizero:",  len(pi_grid)
-print generate_tree_cut(pi_grid[37195])
+
 rdata = None
 
 #output file containing fits and canvases
@@ -492,8 +492,8 @@ for iev in iev_points:
         #format the result if there was a fit result
         if fit_result != None:
             for jj in fit_result[2:]:
-                if jj > 10: fit_params_string+="%.3g\t" % jj
-                else:  fit_params_string+="%.3g\t" % jj
+                if jj > 1000: fit_params_string+="%.1g\t" % jj
+                else:  fit_params_string+="%.2g\t" % jj
         else:
             fit_params_string+="NO_RESULT\t"
         fit_params_string+="\n"

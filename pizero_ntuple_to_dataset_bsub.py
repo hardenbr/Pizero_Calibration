@@ -68,13 +68,13 @@ for ii in range(n_file):
 	#generate the commands to run on the raw and convert to trees
         output_name = output_dir+"/res/" + files[ii].split("/")[-1] 
 	
-	eta_b = options.ETA_BEGIN
-	eta_e = options.ETA_END
+	eta_b = float(options.ETA_BEGIN)
+	eta_e = float(options.ETA_END)
 	cmd = ""
 
 	#if the eta range is specified pass this to buildgrid and change the output name of the file
 	if eta_b != 0 or eta_e < 10:
-		output_name = output_name[:-5]+ "_%3.0f_%3.0f.root" % (eta_b*100,eta_e*100)
+		output_name = output_name[:-5]+ "_%i_%i.root" % (eta_b*100,eta_e*100)
 		cmd = "python %s/trim_hlt.py -f %s -o %s --eta_b %f --eta_e %f \n" % (output_dir, files[ii], output_name, eta_b, eta_e)
 	else:
 		cmd = ""
