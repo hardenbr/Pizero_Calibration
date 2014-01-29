@@ -8,6 +8,7 @@
 from ROOT import gSystem, RooArgSet, RooFit
 gSystem.Load('libRooFit')
 from  optparse  import OptionParser
+import array
 import numpy as np
 import itertools, math
 import ROOT as rt
@@ -49,7 +50,7 @@ parser.add_option("-w","--write", dest="do_write", help="write the fits and canv
 parser.print_help()
 
 def get_hlt_hists(tree):
-    print "Producting histograms for each bit"
+    print "Producing histograms for each bit"
 
     #determine the events in the tree and build an iteration list
 
@@ -78,31 +79,52 @@ def get_hlt_hists(tree):
         if iev % 5000 == 0: print "Filling L1 at event...",iev
         iev += 1
         entry = itlist.Next()
-        
-        #set the RooArgSet and save                                                          
-        a = rt.RooArgSet(args)
+        tree.GetEntry(entry)
 
-        l1bits = tree.L1bits        
+        #if we restricted to a number of events
+        if options.nevents == iev: break
+
+        l1bits_array = tree.L1bits        
+        l1bits = []
+       
+        if options.verbose: print "EVENT NUMBER: %i" % iev
+        
+        for ii in range(N_TRIGGERS):
+            val = l1bits_array[ii]
+            if options.verbose and val == 1:
+                print "%i array value: %f" % (ii, val)
+            l1bits.append(val)
+            
         sum_bits = sum(l1bits)
+
+        if options.verbose: 
+            print "L1 BIT ARRAY",
+            print l1bits
+            print "SUM BITS", sum_bits
 
         #if it is uniq
         if sum_bits == 1:
             #find the uniq bit
-            for il1 in range(len(l1bits)):                 
-                if l1bits[il1] == 1: 
+            for il1 in range(N_TRIGGERS):                 
+                val = l1bits[il1]
+                if val == 1:  #found the bit
+                    if options.verbose: print "Filling PIZEROS \n\n\n\n"
+                    #loop over pi0s in the event
                     for ipi in range(tree.STr2_NPi0_rec): 
-                        l1_uniq_hists[il1].Fill(tree.STr2_mPi0_rec)
-                        l1_raw_hists[il1].Fill(tree.STr2_mPi0_rec)
+                        mass = tree.STr2_mPi0_rec[ipi]
+                        l1_uniq_hists[il1].Fill(mass)
+                        l1_raw_hists[il1].Fill(mass)
                     break #we are done once we find the first one
         #if it is raw
-        else:
+        else:            
             found_bits = 0
             for il1 in range(len(l1bits)):                 
                 if l1bits[il1] == 1: 
                     sum_bits += 1
                     for ipi in range(tree.STr2_NPi0_rec): 
-                        l1_raw_hists[il1].Fill(tree.STr2_mPi0_rec)
-                if found_bits = sum_bits: break #we found them all
+                        mass = tree.STr2_mPi0_rec[ipi]
+                        l1_raw_hists[il1].Fill(mass)
+                if found_bits == sum_bits: break #we found them all
 
     return (l1_raw_hists, l1_uniq_hists)
 
@@ -133,7 +155,7 @@ def build_workspace_hist(tree,cut,l1num):
 
     return (workspace, hist, eff)
 
-def fit_dataset(rdata,il1,eff):
+def fit_dataset(rdata,il1,eff,israw):
 
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .11, .135,"GeV")
@@ -188,7 +210,11 @@ def fit_dataset(rdata,il1,eff):
     bkg_scale = (normBkg_sob / normBkg_full)
 
     #put the frame on a canvas
-    canvas = rt.TCanvas("canvas_%i" % il1)
+    canvas = None
+    if israw:
+        canvas = rt.TCanvas("r_canvas_%i" % il1)
+    else:
+        canvas = rt.TCanvas("u_canvas_%i" % il1)
 
     #make a frame
     frame = x.frame()
@@ -244,13 +270,17 @@ def fit_dataset(rdata,il1,eff):
     line2 = "reduced #chi^{2}: %.4f" % chi2
     line3 = "#mu: %.4f, #sigma: %.4f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
     line4 = "Efficiency %.6f" % eff
-    line5 = "Grid #: %i" % il1
+    line5 = "L1Bit #: %i" % il1
+    line6 = None
+    if israw: line6 = "RAW"
+    else: line6 = "UNIQ"
     
     lat.DrawLatex(xmin,ymin,line)
     lat.DrawLatex(xmin,ymin-ypass,line2)
     lat.DrawLatex(xmin,ymin-2*ypass,line3)
     lat.DrawLatex(xmin,ymin-3*ypass,line4)
     lat.DrawLatex(xmin,ymin-4*ypass,line5)
+    lat.DrawLatex(xmin,ymin-5*ypass,line6)
  
     return (result, canvas, n_s_sob, n_b_sob, s_over_b, chi2, error_e, mean_val, sigma_val, mu_over_err, eff)
 
@@ -283,60 +313,162 @@ output = rt.TFile(options.outfilename,"RECREATE")
 #output files containing cut values and fit calculations
 outfile_dir = options.outfilename[:-5]
 
-fit_params_string = "@GRID#\t\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
-cut_string = "@grid#\t\tga_pt\tpi_pt\telyr\ts4s9\tiso\tncri1\tncri2\n"
+uniq_fit_params_string = "@GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
+raw_fit_params_string = "@GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
 
 list = rt.TList() 
 for tree in tree_set: list.Add(tree)
+
 sum_trees = rt.TTree.MergeTrees(list)
 sum_trees.SetName("Tree_HLT")
 
+(raw_hists, uniq_hists) = get_hlt_hists(sum_trees)
 
-(raw_hists, uniq_hists) = get_hlt_hists(sum_trees))
+uniq_fit_results = []
+raw_fit_results = []
 
 #scan point by point
-for il1 in range(N_TRIGGERS)
+for il1 in range(N_TRIGGERS):
     print "Scanning L1 Bit:", il1
 
     uniq_data = uniq_hists[il1]
     raw_data = raw_hists[il1]
 
-    if raw_data.GetEntries() == 0:
+    eff = 1
+
+    n_raw = raw_data.GetEntries()
+    n_uniq = uniq_data.GetEntries()
+
+    if  n_raw == 0:
         fit_result = None
-        print "...not fitting.."
+        print "...not fitting.. n events in hist:", n_raw
+        uniq_fit_results.append(0)
+        raw_fit_results.append(0)
     else:
         print "...Fitting..."
 
+        uniq_fit_result = None
+        raw_fit_result = None
+
         #generate the fit result
-        fit_result = fit_dataset(rdata, il1, eff)
-
-        if options.do_write:
-            #sum_trees.Write("ttree_%i" % iev)
-            rdata.Write("tree_%i" % il1)
-            #write the result
-            fit_result[0].Write("fit_%i" % il1) 
-            #write the frame
-            fit_result[1].Write("frame_%i" % il1)
-
-        #make sure tabbing is correct for output
-        fit_params_string += "@@%i \t" % il1
-        if iev <= 9999: fit_params_string += "\t" 
-
-        #format the result if there was a fit result
-        if fit_result != None:
-            for jj in fit_result[2:]:
-                if jj > 1000: fit_params_string+="%.1g\t" % jj
-                else:  fit_params_string+="%.2g\t" % jj
+        if n_uniq > 1000:            
+            uniq_fit_result = fit_dataset(uniq_data, il1, eff, False)
+            uniq_fit_results.append(uniq_fit_result)
         else:
-            fit_params_string+="NO_RESULT EFFICIENCY TOO LOW eff=%f" % eff
-        fit_params_string+="\n"
+            uniq_fit_results.append(0)
 
+        if n_raw > 1000: 
+            raw_fit_result = fit_dataset(raw_data, il1, eff, True)
+            raw_fit_results.append(raw_fit_result)
+        else:
+            raw_fit_results.append(0)
+
+        if options.do_write:                        
+            if n_uniq > 0: uniq_data.Write("u_hist_%i" % il1)
+            if n_raw > 0: raw_data.Write("r_hist_%i" % il1)
+
+            if uniq_fit_result != None:
+                #write the result
+                uniq_fit_result[0].Write("u_fit_%i" % il1) 
+                #write the frame
+                uniq_fit_result[1].Write("u_frame_%i" % il1)
+
+            if raw_fit_result != None:
+                #write the result
+                raw_fit_result[0].Write("r_fit_%i" % il1) 
+                #write the frame
+                raw_fit_result[1].Write("r_frame_%i" % il1)
+
+    #make sure tabbing is correct for output
+    uniq_fit_params_string += "@@%i \t" % il1
+    if il1 <= 9999: uniq_fit_params_string += "\t" 
+
+    #format the result if there was a fit result
+    if uniq_fit_result != None:
+        for jj in uniq_fit_result[2:]:
+            if jj > 1000: uniq_fit_params_string+="%.1g\t" % jj
+            else:  uniq_fit_params_string+="%.2g\t" % jj
+        uniq_fit_params_string+="\n"
+    else:
+        uniq_fit_params_string+= "NO_RESULT EFFICIENCY EVENT COUNT  UNIQ: %i" %  n_uniq
+        uniq_fit_params_string+="\n"
+        
     print "\n"
-    print fit_params_string
+    print uniq_fit_params_string
     print "\n"
+
+    #make sure tabbing is correct for output
+    raw_fit_params_string += "@@%i \t" % il1
+    if il1 <= 9999: uniq_fit_params_string += "\t" 
+
+    #format the result if there was a fit result
+    if raw_fit_result != None:
+        for jj in raw_fit_result[2:]:
+            if jj > 1000: raw_fit_params_string+="%.1g\t" % jj
+            else:  raw_fit_params_string+="%.2g\t" % jj
+        raw_fit_params_string+="\n"
+    else:
+        raw_fit_params_string+= "NO_RESULT EFFICIENCY EVENT COUNT: RAW: %i" %  n_raw
+        raw_fit_params_string+="\n"
+        
+    print "\n"
+    print raw_fit_params_string
+    print "\n"
+
+########################
+##  SUMMARIZE RESULTS ##
+########################
+
+sob_uniq_list = []
+sob_raw_list = []
+eff_uniq_list = []
+eff_raw_list = []
+
+print uniq_fit_results
+
+print raw_fit_results
+
+for ii in range(N_TRIGGERS):
+    if uniq_fit_results[ii] == 0:
+        sob_uniq_list.append(0.0)
+        eff_uniq_list.append(0.0)
+    else:
+        sob = uniq_fit_results[ii][4]
+        sob_uniq_list.append(sob)
+        eff_uniq_list.append(0.0)
+
+
+    
+for ii in range(N_TRIGGERS):
+    if raw_fit_results[ii] == 0:
+        sob_raw_list.append(0)
+        eff_raw_list.append(0.0)
+    else:
+        sob = raw_fit_results[ii][4]
+        sob_raw_list.append(sob)
+        eff_raw_list.append(0.0)
+
+print sob_raw_list
+
+trigger_bits = array.array("f",range(N_TRIGGERS))
+
+array_sob_uniq = array.array("f",sob_uniq_list)
+array_sob_raw = array.array("f",sob_raw_list)
+array_eff_uniq = array.array("f",eff_uniq_list)
+array_eff_raw = array.array("f",eff_raw_list)
+
+sob_uniq_graph = rt.TGraph( N_TRIGGERS,trigger_bits, array_sob_uniq)
+sob_raw_graph = rt.TGraph( N_TRIGGERS,trigger_bits, array_sob_raw)
+eff_uniq_graph = rt.TGraph( N_TRIGGERS,trigger_bits, array_eff_uniq)
+eff_raw_graph = rt.TGraph( N_TRIGGERS,trigger_bits, array_eff_raw)
+
+sob_uniq_graph.Write("sob_uniq_graph")
+sob_raw_graph.Write("sob_raw_graph")
+
+eff_uniq_graph.Write("eff_uniq_graph")
+eff_raw_graph.Write("eff_raw_graph")
+
 
 if options.do_write:
-    workspace.Write()
+#    workspace.Write()
     output.Close()
-    
-
