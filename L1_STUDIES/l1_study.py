@@ -49,6 +49,9 @@ parser.add_option("-w","--write", dest="do_write", help="write the fits and canv
 
 parser.print_help()
 
+l1_window_uniq_counts = []
+l1_window_raw_counts = []
+
 def get_hlt_hists(tree):
     print "Producing histograms for each bit"
 
@@ -67,12 +70,16 @@ def get_hlt_hists(tree):
     l1_uniq_hists = []
     l1_raw_hists = []
 
+
     for ii in range(N_TRIGGERS):
         u_hist = rt.TH1F("u_hist_%i" % ii,"u_hist_%i" % ii, 100, .05, .25) 
         r_hist = rt.TH1F("r_hist_%i" % ii,"r_hist_%i" % ii, 100, .05, .25) 
 
         l1_uniq_hists.append(u_hist)
         l1_raw_hists.append(r_hist)
+
+        l1_window_uniq_counts.append(0)
+        l1_window_raw_counts.append(0)
 
     #loop over the tree and add it to the RooDataSet
     while iev < tree.GetEntries():
@@ -112,8 +119,14 @@ def get_hlt_hists(tree):
                     #loop over pi0s in the event
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
+
                         l1_uniq_hists[il1].Fill(mass)
                         l1_raw_hists[il1].Fill(mass)
+                        
+                        #check the window
+                        if mass < .1556 and mass > .0772:
+                            l1_window_uniq_counts[il1] += 1
+                            l1_window_raw_counts[il1] += 1
                     break #we are done once we find the first one
         #if it is raw
         else:            
@@ -124,6 +137,11 @@ def get_hlt_hists(tree):
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
                         l1_raw_hists[il1].Fill(mass)
+                        #check the window
+                        if mass < .1556 and mass > .0772:
+                            l1_window_uniq_counts[il1] += 1
+                            l1_window_raw_counts[il1] += 1
+                    
                 if found_bits == sum_bits: break #we found them all
 
     return (l1_raw_hists, l1_uniq_hists)
@@ -322,7 +340,7 @@ for f in dataset_file_lines_stripped: tree.Add(f)
 
 
 print "TOTAL NUMBER OF EVENTS IN MERGED TREES: %i" % tree.GetEntries()
-
+#prase the histograms corresponding the l1 bits
 (raw_hists, uniq_hists) = get_hlt_hists(tree)
 
 uniq_fit_results = []
@@ -352,13 +370,13 @@ for il1 in range(N_TRIGGERS):
         raw_fit_result = None
 
         #generate the fit result
-        if n_uniq > 1000:            
+        if n_uniq > 0:            
             uniq_fit_result = fit_dataset(uniq_data, il1, eff, False)
             uniq_fit_results.append(uniq_fit_result)
         else:
             uniq_fit_results.append(0)
 
-        if n_raw > 1000: 
+        if n_raw > 0: 
             raw_fit_result = fit_dataset(raw_data, il1, eff, True)
             raw_fit_results.append(raw_fit_result)
         else:
@@ -425,43 +443,187 @@ sob_raw_list = []
 eff_uniq_list = []
 eff_raw_list = []
 
-print uniq_fit_results
-
-print raw_fit_results
-
 for ii in range(N_TRIGGERS):
     if uniq_fit_results[ii] == 0:
         sob_uniq_list.append(0.0)
-        eff_uniq_list.append(0.0)
+        eff_uniq_list.append(float(l1_window_uniq_counts[ii])/sum(l1_window_uniq_counts) )
     else:
         sob = uniq_fit_results[ii][4]
         sob_uniq_list.append(sob)
-        eff_uniq_list.append(0.0)
+        eff_uniq_list.append(float(l1_window_uniq_counts[ii])/sum(l1_window_uniq_counts) )
 
+print l1_window_uniq_counts
+print "SUM UNIQ", sum(l1_window_uniq_counts)    
 
-    
 for ii in range(N_TRIGGERS):
     if raw_fit_results[ii] == 0:
         sob_raw_list.append(0)
-        eff_raw_list.append(0.0)
+        eff_raw_list.append(float(l1_window_raw_counts[ii])/sum(l1_window_raw_counts))
     else:
         sob = raw_fit_results[ii][4]
         sob_raw_list.append(sob)
-        eff_raw_list.append(0.0)
+        eff_raw_list.append(float(l1_window_raw_counts[ii])/sum(l1_window_raw_counts))
 
-print sob_raw_list
+print l1_window_raw_counts
+print "SUM RAW", sum(l1_window_raw_counts)    
+
+l1_names = ["L1_ZeroBias",
+            "L1_ZeroBias_Instance1",
+            "L1_BeamGas_Hf_BptxPlusPostQuiet",
+            "",
+            "L1_BeamGas_Hf_BptxMinusPostQuiet",
+            "L1_InterBunch_Bptx",
+            "",
+            "",
+            "L1_BeamHalo",
+            "L1_TripleMu0",
+            "L1_Mu4_HTT125",
+            "L1_Mu3p5_EG12",
+            "L1_Mu12er_ETM20",
+            "L1_MuOpen_EG12",
+            "L1_Mu12_EG7",
+            "L1_SingleJet16",
+            "L1_SingleJet36",
+            "L1_SingleJet52",
+            "L1_SingleJet68",
+            "L1_SingleJet92",
+            "L1_SingleJet128",
+            "L1_DoubleEG6_HTT100",
+            "L1_DoubleEG6_HTT125",
+            "L1_Mu5_DoubleEG5",
+            "L1_DoubleMu3p5_EG5",
+            "L1_DoubleMu5_EG5",
+            "L1_DoubleMu0er_HighQ",
+            "L1_Mu5_DoubleEG6",
+            "L1_DoubleJetC44_ETM30",
+            "L1_Mu3_JetC16_WdEtaPhi2",
+            "L1_Mu3_JetC52_WdEtaPhi2",
+            "L1_SingleEG7",
+            "L1_SingleIsoEG20er",
+            "L1_EG22_ForJet24",
+            "L1_EG22_ForJet32",
+            "L1_DoubleJetC44_Eta1p74_WdEta4",
+            "L1_DoubleJetC56_Eta1p74_WdEta4",
+            "L1_DoubleTauJet44er",
+            "L1_DoubleEG_13_7",
+            "L1_TripleEG_12_7_5",
+            "L1_HTT125",
+            "L1_DoubleJetC52",
+            "L1_SingleMu14er",
+            "L1_SingleIsoEG18er",
+            "L1_DoubleMu_10_Open",
+            "L1_DoubleMu_10_3p5",
+            "L1_ETT80",
+            "L1_SingleEG5",
+            "L1_SingleEG18er",
+            "L1_SingleEG22",
+            "L1_SingleEG12",
+            "L1_SingleEG24",
+            "L1_SingleEG20",
+            "L1_SingleEG30",
+            "L1_DoubleMu3er_HighQ_WdEta22",
+            "L1_SingleMuOpen",
+            "L1_SingleMu16",
+            "L1_SingleMu3",
+            "L1_DoubleMu_5er_0er_HighQ_WdEta22",
+            "L1_SingleMu7",
+            "L1_SingleMu20er",
+            "L1_SingleMu12",
+            "L1_SingleMu20",
+            "L1_SingleMu25er",
+            "L1_ETM100",
+            "L1_ETM36",
+            "L1_ETM30",
+            "L1_ETM50",
+            "L1_ETM70",
+            "L1_ETT300",
+            "L1_HTT100",
+            "L1_HTT150",
+            "L1_HTT175",
+            "L1_HTT200",
+            "L1_Mu10er_JetC12_WdEtaPhi1_DoubleJetC_20_12",
+            "L1_Mu10er_JetC32",
+            "L1_DoubleJetC64",
+            "L1_Mu10er_JetC12_WdEtaPhi1_DoubleJetC_32_12",
+            "L1_SingleJetC32_NotBptxOR",
+            "L1_ETM40",
+            "L1_Mu0_HTT50",
+            "L1_Mu0_HTT100",
+            "L1_DoubleEG5",
+            "L1_IsoEG18er_JetC_Cen36_Tau28_dPhi1",
+            "L1_EG18er_JetC_Cen36_Tau28_dPhi1",
+            "",
+            "L1_SingleMu16er",
+            "L1_EG18er_JetC_Cen28_Tau20_dPhi1",
+            "L1_IsoEG18er_JetC_Cen32_Tau24_dPhi1",
+            "L1_SingleMu6_NotBptxOR",
+            "L1_Mu8_DoubleJetC20",
+            "",
+            "L1_DoubleMu0",
+            "",
+            "L1_EG8_DoubleJetC20",
+            "L1_DoubleMu5",
+            "L1_DoubleJetC56",
+            "L1_TripleMu0_HighQ",
+            "L1_TripleMu_5_5_0",
+            "L1_ETT140",
+            "L1_DoubleJetC36",
+            "L1_DoubleJetC36_ETM30",
+            "L1_SingleJet36_FwdVeto5",
+            "L1_TripleJet_64_44_24_VBF",
+            "L1_TripleJet_64_48_28_VBF",
+            "L1_TripleJet_68_48_32_VBF",
+            "L1_QuadJetC40",
+            "L1_QuadJetC36",
+            "L1_TripleJetC_52_28_28",
+            "L1_QuadJetC32",
+            "L1_DoubleForJet16_EtaOpp",
+            "L1_DoubleEG3_FwdVeto",
+            "L1_SingleJetC20_NotBptxOR",
+            "L1_SingleJet16_FwdVeto5",
+            "L1_SingleForJet16",
+            "L1_DoubleJetC36_RomanPotsOR",
+            "L1_SingleMu20_RomanPotsOR",
+            "L1_SingleEG20_RomanPotsOR",
+            "L1_DoubleMu5_RomanPotsOR",
+            "L1_DoubleEG5_RomanPotsOR",
+            "L1_SingleJet52_RomanPotsOR",
+            "",
+            "L1_SingleMu18er",
+            "L1_MuOpen_EG5",
+            "L1_DoubleMu_12_5",
+            "L1_TripleEG7",
+            "",
+            ""]
+
 
 trigger_bits = array.array("f",range(N_TRIGGERS))
 
 array_sob_uniq = array.array("f",sob_uniq_list)
 array_sob_raw = array.array("f",sob_raw_list)
+
 array_eff_uniq = array.array("f",eff_uniq_list)
 array_eff_raw = array.array("f",eff_raw_list)
 
+
+
 sob_uniq_graph = rt.TGraph( N_TRIGGERS,trigger_bits, array_sob_uniq)
-sob_raw_graph = rt.TGraph( N_TRIGGERS,trigger_bits, array_sob_raw)
-eff_uniq_graph = rt.TGraph( N_TRIGGERS,trigger_bits, array_eff_uniq)
-eff_raw_graph = rt.TGraph( N_TRIGGERS,trigger_bits, array_eff_raw)
+sob_raw_graph = rt.TGraph(N_TRIGGERS,trigger_bits, array_sob_raw)
+eff_uniq_graph = rt.TGraph(N_TRIGGERS,trigger_bits, array_eff_uniq)
+eff_raw_graph = rt.TGraph(N_TRIGGERS,trigger_bits, array_eff_raw)
+
+#set the xaxis names
+for ii in range(N_TRIGGERS):
+    name = l1_names[ii]
+    sob_uniq_graph.GetXaxis().SetBinLabel(1+ii,name)
+    sob_raw_graph.GetXaxis().SetBinLabel(1+ii,name)
+    eff_uniq_graph.GetXaxis().SetBinLabel(1+ii,name)
+    eff_raw_graph.GetXaxis().SetBinLabel(1+ii,name)
+
+sob_uniq_graph.GetXaxis().LabelsOption("v")
+sob_raw_graph.GetXaxis().LabelsOption("v")
+eff_uniq_graph.GetXaxis().LabelsOption("v")
+eff_raw_graph.GetXaxis().LabelsOption("v")
 
 sob_uniq_graph.Write("sob_uniq_graph")
 sob_raw_graph.Write("sob_raw_graph")
@@ -469,7 +631,5 @@ sob_raw_graph.Write("sob_raw_graph")
 eff_uniq_graph.Write("eff_uniq_graph")
 eff_raw_graph.Write("eff_raw_graph")
 
-
 if options.do_write:
-#    workspace.Write()
     output.Close()
