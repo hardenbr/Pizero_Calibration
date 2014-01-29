@@ -103,7 +103,6 @@ def get_hlt_hists(tree):
             l1bits.append(val)
             
         sum_bits = sum(l1bits)
-
         if options.verbose: 
             print "L1 BIT ARRAY",
             print l1bits
@@ -130,19 +129,15 @@ def get_hlt_hists(tree):
                     break #we are done once we find the first one
         #if it is raw
         else:            
-            found_bits = 0
+
             for il1 in range(len(l1bits)):                 
                 if l1bits[il1] == 1: 
-                    sum_bits += 1
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
                         l1_raw_hists[il1].Fill(mass)
                         #check the window
                         if mass < .1556 and mass > .0772:
-                            l1_window_uniq_counts[il1] += 1
                             l1_window_raw_counts[il1] += 1
-                    
-                if found_bits == sum_bits: break #we found them all
 
     return (l1_raw_hists, l1_uniq_hists)
 
@@ -331,8 +326,8 @@ output = rt.TFile(options.outfilename,"RECREATE")
 #output files containing cut values and fit calculations
 outfile_dir = options.outfilename[:-5]
 
-uniq_fit_params_string = "@GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
-raw_fit_params_string = "@GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
+uniq_fit_params_string = "@UNIQ#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
+raw_fit_params_string = "@RAW##\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
 
 
 tree = rt.TChain("Tree_HLT")
@@ -596,40 +591,40 @@ l1_names = ["L1_ZeroBias",
             "",
             ""]
 
-
-trigger_bits = array.array("f",range(N_TRIGGERS))
-
-array_sob_uniq = array.array("f",sob_uniq_list)
-array_sob_raw = array.array("f",sob_raw_list)
-
-array_eff_uniq = array.array("f",eff_uniq_list)
-array_eff_raw = array.array("f",eff_raw_list)
-
-
-
-sob_uniq_graph = rt.TGraph( N_TRIGGERS,trigger_bits, array_sob_uniq)
-sob_raw_graph = rt.TGraph(N_TRIGGERS,trigger_bits, array_sob_raw)
-eff_uniq_graph = rt.TGraph(N_TRIGGERS,trigger_bits, array_eff_uniq)
-eff_raw_graph = rt.TGraph(N_TRIGGERS,trigger_bits, array_eff_raw)
+sob_uniq_hist = rt.TH1F("sob_uniq_hist","sob_uniq_hist",N_TRIGGERS,0,N_TRIGGERS)
+sob_raw_hist = rt.TH1F("sob_raw_hist","sob_raw_hist",N_TRIGGERS,0,N_TRIGGERS)
+eff_uniq_hist = rt.TH1F("eff_uniq_hist","eff_uniq_hist",N_TRIGGERS,0,N_TRIGGERS)
+eff_raw_hist = rt.TH1F("eff_raw_hist","eff_raw_hist",N_TRIGGERS,0,N_TRIGGERS)
 
 #set the xaxis names
 for ii in range(N_TRIGGERS):
     name = l1_names[ii]
-    sob_uniq_graph.GetXaxis().SetBinLabel(1+ii,name)
-    sob_raw_graph.GetXaxis().SetBinLabel(1+ii,name)
-    eff_uniq_graph.GetXaxis().SetBinLabel(1+ii,name)
-    eff_raw_graph.GetXaxis().SetBinLabel(1+ii,name)
 
-sob_uniq_graph.GetXaxis().LabelsOption("v")
-sob_raw_graph.GetXaxis().LabelsOption("v")
-eff_uniq_graph.GetXaxis().LabelsOption("v")
-eff_raw_graph.GetXaxis().LabelsOption("v")
+    sob_uniq_hist.Fill(ii,sob_uniq_list[ii])
+    sob_raw_hist.Fill(ii,sob_raw_list[ii])
+    eff_uniq_hist.Fill(ii,eff_uniq_list[ii])
+    eff_raw_hist.Fill(ii,eff_raw_list[ii])
 
-sob_uniq_graph.Write("sob_uniq_graph")
-sob_raw_graph.Write("sob_raw_graph")
+    sob_uniq_hist.GetXaxis().SetBinLabel(1+ii,name)
+    sob_raw_hist.GetXaxis().SetBinLabel(1+ii,name)
+    eff_uniq_hist.GetXaxis().SetBinLabel(1+ii,name)
+    eff_raw_hist.GetXaxis().SetBinLabel(1+ii,name)
 
-eff_uniq_graph.Write("eff_uniq_graph")
-eff_raw_graph.Write("eff_raw_graph")
+sob_uniq_hist.GetXaxis().LabelsOption("v")
+sob_raw_hist.GetXaxis().LabelsOption("v")
+eff_uniq_hist.GetXaxis().LabelsOption("v")
+eff_raw_hist.GetXaxis().LabelsOption("v")
+
+sob_uniq_hist.GetYaxis().SetTitle("S/B within 2#sigma")
+sob_raw_hist.GetYaxis().SetTitle("S/B within 2#sigma")
+eff_uniq_hist.GetYaxis().SetTitle("Efficiency within 2#sigma")
+eff_raw_hist.GetYaxis().SetTitle("Efficiency within 2#sigma")
+
+sob_uniq_hist.Write()
+sob_raw_hist.Write()
+
+eff_uniq_hist.Write()
+eff_raw_hist.Write()
 
 if options.do_write:
     output.Close()
