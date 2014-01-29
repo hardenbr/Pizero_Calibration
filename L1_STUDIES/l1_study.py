@@ -304,7 +304,7 @@ temp_file = None
 #build the list of files
 file_set = map(lambda(x):rt.TFile(x),dataset_file_lines_stripped)
 #build the list of trees in the files
-tree_set = map(lambda(x):x.Get("Tree_HLT"), file_set)
+#tree_set = map(lambda(x):x.Get("Tree_HLT"), file_set)
 rdata = None
 
 #output file containing fits and canvases
@@ -316,13 +316,14 @@ outfile_dir = options.outfilename[:-5]
 uniq_fit_params_string = "@GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
 raw_fit_params_string = "@GRID#\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ERR\tEFF\n"
 
-list = rt.TList() 
-for tree in tree_set: list.Add(tree)
 
-sum_trees = rt.TTree.MergeTrees(list)
-sum_trees.SetName("Tree_HLT")
+tree = rt.TChain("Tree_HLT")
+for f in dataset_file_lines_stripped: tree.Add(f)
 
-(raw_hists, uniq_hists) = get_hlt_hists(sum_trees)
+
+print "TOTAL NUMBER OF EVENTS IN MERGED TREES: %i" % tree.GetEntries()
+
+(raw_hists, uniq_hists) = get_hlt_hists(tree)
 
 uniq_fit_results = []
 raw_fit_results = []
