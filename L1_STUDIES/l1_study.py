@@ -1,14 +1,11 @@
 ## Author: Joshua Hardenbrook - Princeton University - joshuarh@princeton.edu
 
 ##PARAMETERS TO CHANGE###
-#(1) in the method build_grid() you must specify the values of the cuts to scan
-#(2) in the method apply_tree_cut() you must specify how the grid cuts will be applied
-#(3) in the method fit_dataset() you should put a reasonable range on the signal/bkg norm
 
 from ROOT import gSystem, RooArgSet, RooFit
 gSystem.Load('libRooFit')
 from  optparse  import OptionParser
-import array
+import array, pickle
 import numpy as np
 import itertools, math
 import ROOT as rt
@@ -44,6 +41,10 @@ parser.add_option("-n", "--nevents", dest="nevents",
 
 parser.add_option("-d", "--dataset", dest="dataset",
                   help="list of root files containing the processesed datasets. If this is not specified, the roodataset will be generated and with the name roo(NAME).root",
+                  action="store",type="string",default="no_file")
+
+parser.add_option("-p", "--pickle", dest="pickle",
+                  help="name of file with pickled histogram array",
                   action="store",type="string",default="no_file")
 
 parser.add_option("-w","--write", dest="do_write", help="write the fits and canvases",
@@ -143,7 +144,7 @@ def get_hlt_hists(tree):
                         if mass < .1556 and mass > .0772:
                             l1_window_raw_counts[il1] += 1
 
-    return (l1_raw_hists, l1_uniq_hists)
+    return (l1_raw_hists, l1_uniq_hists, l1_window_uniq_counts, l1_window_raw_counts)
 
 def build_workspace_hist(tree,cut,l1num):
     #determine the events in the tree and build an iteration list
@@ -176,7 +177,7 @@ def fit_dataset(rdata,il1,eff,israw):
 
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .10, .135,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .011, .08, .02,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .01, .0085, .02,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     #t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
@@ -197,9 +198,11 @@ def fit_dataset(rdata,il1,eff,israw):
     
     #add the signal and the background in a model
     tot = rdata.GetEntries()
-    window = rdata.Integral(rdata.FindBin(.06),rdata.FindBin(.17))
-    n_sig = rt.RooRealVar("nsig","#pi^{0} yield", window*.5,window*.3, window*.8)
-    n_bkg = rt.RooRealVar("nbkg","background yield",tot*.8, tot*.2, tot*.9)
+    window = rdata.Integral(rdata.FindBin(.09),rdata.FindBin(.15))
+    print "%i TOTAL IN WINDOW: %f" % (il1,window)
+
+    n_sig = rt.RooRealVar("nsig","#pi^{0} yield", tot*.1,tot*.05, tot*.25)
+    n_bkg = rt.RooRealVar("nbkg","background yield",tot*.7, tot*.5, tot*.95)
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
     
@@ -289,7 +292,7 @@ def fit_dataset(rdata,il1,eff,israw):
     line = "S/B: %.4f #pm %.5f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
     line2 = "reduced #chi^{2}: %.4f" % chi2
     line3 = "#mu: %.4f, #sigma: %.4f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
-    line4 = "Efficiency %.6f" % eff
+#    line4 = "Efficiency %.6f" % eff
     line5 = "L1Bit #: %i" % il1
     line6 = None
     if israw: line6 = "RAW"
@@ -298,9 +301,9 @@ def fit_dataset(rdata,il1,eff,israw):
     lat.DrawLatex(xmin,ymin,line)
     lat.DrawLatex(xmin,ymin-ypass,line2)
     lat.DrawLatex(xmin,ymin-2*ypass,line3)
-    lat.DrawLatex(xmin,ymin-3*ypass,line4)
-    lat.DrawLatex(xmin,ymin-4*ypass,line5)
-    lat.DrawLatex(xmin,ymin-5*ypass,line6)
+ #   lat.DrawLatex(xmin,ymin-3*ypass,line4)
+    lat.DrawLatex(xmin,ymin-3*ypass,line5)
+    lat.DrawLatex(xmin,ymin-4*ypass,line6)
  
     return (result, canvas, n_s_sob, n_b_sob, s_over_b, chi2, error_e, mean_val, sigma_val, mu_over_err, eff)
 
@@ -343,7 +346,21 @@ for f in dataset_file_lines_stripped: tree.Add(f)
 
 print "TOTAL NUMBER OF EVENTS IN MERGED TREES: %i" % tree.GetEntries()
 #prase the histograms corresponding the l1 bits
-(raw_hists, uniq_hists) = get_hlt_hists(tree)
+
+(raw_hists, uniq_hists) = (None,None)
+
+if options.pickle == "no_file":
+    (raw_hists, uniq_hists) = get_hlt_hists(tree)[0:2]
+    pickle.dump( (raw_hists, uniq_hists, l1_window_uniq_counts, l1_window_raw_counts), open( "hists_%s.p" % options.outfilename[:-5], "wb" ) )
+else:
+    (raw_hists, uniq_hists, l1_window_uniq_counts, l1_window_raw_counts) = pickle.load( open(options.pickle,"rb") )
+
+    print raw_hists
+    print uniq_hists
+    print "LENGTH"
+    print len(raw_hists)
+    print len(uniq_hists)
+    print uniq_hists[127]
 
 uniq_fit_results = []
 raw_fit_results = []
@@ -414,9 +431,9 @@ for il1 in range(N_TRIGGERS):
         uniq_fit_params_string+= "NO_RESULT EFFICIENCY EVENT COUNT  UNIQ: %i" %  n_uniq
         uniq_fit_params_string+="\n"
         
-    print "\n"
-    print uniq_fit_params_string
-    print "\n"
+#    print "\n"
+#    print uniq_fit_params_string
+#    print "\n"
 
     #make sure tabbing is correct for output
     raw_fit_params_string += "@@%i \t" % il1
@@ -432,9 +449,9 @@ for il1 in range(N_TRIGGERS):
         raw_fit_params_string+= "NO_RESULT EFFICIENCY EVENT COUNT: RAW: %i" %  n_raw
         raw_fit_params_string+="\n"
         
-    print "\n"
-    print raw_fit_params_string
-    print "\n"
+#    print "\n"
+#    print raw_fit_params_string
+#    print "\n"
 
 ########################
 ##  SUMMARIZE RESULTS ##
@@ -447,11 +464,15 @@ eff_raw_list = []
 
 for ii in range(N_TRIGGERS):
     if uniq_fit_results[ii] == 0:
+
         sob_uniq_list.append(0.0)
         eff_uniq_list.append(float(l1_window_uniq_counts[ii])/sum(l1_window_uniq_counts) )
     else:
         sob = uniq_fit_results[ii][4]
         sob_uniq_list.append(sob)
+        
+        print "UNIQ COUNTS ARRAY"
+        print l1_window_uniq_counts
         eff_uniq_list.append(float(l1_window_uniq_counts[ii])/sum(l1_window_uniq_counts) )
 
 print l1_window_uniq_counts
