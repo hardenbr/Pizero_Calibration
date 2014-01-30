@@ -175,8 +175,8 @@ def build_workspace_hist(tree,cut,l1num):
 def fit_dataset(rdata,il1,eff,israw):
 
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
-    mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .11, .135,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .013, .011, .02,"GeV")
+    mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .10, .135,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .011, .08, .02,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     #t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
@@ -197,9 +197,9 @@ def fit_dataset(rdata,il1,eff,israw):
     
     #add the signal and the background in a model
     tot = rdata.GetEntries()
-
-    n_sig = rt.RooRealVar("nsig","#pi^{0} yield", tot*.2,tot*.05, tot*.3)
-    n_bkg = rt.RooRealVar("nbkg","background yield",tot*.9, tot*.2, tot*.9)
+    window = rdata.Integral(rdata.FindBin(.06),rdata.FindBin(.17))
+    n_sig = rt.RooRealVar("nsig","#pi^{0} yield", window*.5,window*.3, window*.8)
+    n_bkg = rt.RooRealVar("nbkg","background yield",tot*.8, tot*.2, tot*.9)
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
     
@@ -255,7 +255,10 @@ def fit_dataset(rdata,il1,eff,israw):
     s_over_b = n_s_sob / n_b_sob 
 
     #goodness of fit
-    error_e = s_over_b * math.sqrt(math.pow(n_sig.getError() / n_sig.getVal(), 2) + math.pow(n_bkg.getError() / n_bkg.getVal(), 2))
+    error_e = -99
+    if n_sig.getVal() > 0 and n_bkg.getVal() > 0:
+        error_e = s_over_b * math.sqrt(math.pow(n_sig.getError() / n_sig.getVal(), 2) + math.pow(n_bkg.getError() / n_bkg.getVal(), 2))
+        
     chi2 = frame.chiSquare()
     
     #signal calculations
@@ -479,10 +482,16 @@ eff_raw_hist = rt.TH1F("eff_raw_hist","eff_raw_hist",N_TRIGGERS,0,N_TRIGGERS)
 for ii in range(N_TRIGGERS):
     name = str(ii) + ": " + l1_lines_stripped[ii]
 
-    sob_uniq_hist.Fill(ii,sob_uniq_list[ii])
-    sob_raw_hist.Fill(ii,sob_raw_list[ii])
-    eff_uniq_hist.Fill(ii,eff_uniq_list[ii])
-    eff_raw_hist.Fill(ii,eff_raw_list[ii])
+    eff_uniq = eff_uniq_list[ii]
+    eff_raw = eff_raw_list[ii]
+    if eff_raw > .01: 
+        sob_raw_hist.Fill(ii,sob_raw_list[ii])
+
+    if eff_uniq> .01:
+        sob_uniq_hist.Fill(ii,sob_uniq_list[ii])
+
+    eff_uniq_hist.Fill(ii,eff_uniq)
+    eff_raw_hist.Fill(ii,eff_raw)
 
     sob_uniq_hist.GetXaxis().SetBinLabel(1+ii,name)
     sob_raw_hist.GetXaxis().SetBinLabel(1+ii,name)
