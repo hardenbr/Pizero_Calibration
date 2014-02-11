@@ -61,9 +61,8 @@ def get_hlt_hists(tree):
     print "Producing histograms for each bit"
 
     #determine the events in the tree and build an iteration list
-
     tree.Draw(">>iterlist", "", "entrylist")
-
+    
     itlist = rt.gDirectory.Get("iterlist")
     
     #build the workspace
@@ -77,8 +76,8 @@ def get_hlt_hists(tree):
 
 
     for ii in range(N_TRIGGERS):
-        u_hist = rt.TH1F("u_hist_%i" % ii,"u_hist_%i" % ii, 100, .05, .25) 
-        r_hist = rt.TH1F("r_hist_%i" % ii,"r_hist_%i" % ii, 100, .05, .25) 
+        u_hist = rt.TH1F("u_hist_%i" % ii,"u_hist_%i" % ii, 50, .05, .25) 
+        r_hist = rt.TH1F("r_hist_%i" % ii,"r_hist_%i" % ii, 50, .05, .25) 
 
         l1_uniq_hists.append(u_hist)
         l1_raw_hists.append(r_hist)
@@ -134,8 +133,7 @@ def get_hlt_hists(tree):
                     break #we are done once we find the first one
         #if it is raw
         else:            
-
-            for il1 in range(len(l1bits)):                 
+            for il1 in range(N_TRIGGERS):                 
                 if l1bits[il1] == 1: 
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
@@ -355,13 +353,6 @@ if options.pickle == "no_file":
 else:
     (raw_hists, uniq_hists, l1_window_uniq_counts, l1_window_raw_counts) = pickle.load( open(options.pickle,"rb") )
 
-    print raw_hists
-    print uniq_hists
-    print "LENGTH"
-    print len(raw_hists)
-    print len(uniq_hists)
-    print uniq_hists[127]
-
 uniq_fit_results = []
 raw_fit_results = []
 
@@ -377,6 +368,9 @@ for il1 in range(N_TRIGGERS):
     n_raw = raw_data.GetEntries()
     n_uniq = uniq_data.GetEntries()
 
+    uniq_fit_result = None
+    raw_fit_result = None
+
     if  n_raw == 0:
         fit_result = None
         print "...not fitting.. n events in hist:", n_raw
@@ -384,9 +378,6 @@ for il1 in range(N_TRIGGERS):
         raw_fit_results.append(0)
     else:
         print "...Fitting..."
-
-        uniq_fit_result = None
-        raw_fit_result = None
 
         #generate the fit result
         if n_uniq > 0:            
@@ -464,9 +455,11 @@ eff_raw_list = []
 
 for ii in range(N_TRIGGERS):
     if uniq_fit_results[ii] == 0:
-
         sob_uniq_list.append(0.0)
-        eff_uniq_list.append(float(l1_window_uniq_counts[ii])/sum(l1_window_uniq_counts) )
+        if sum(l1_window_uniq_counts) == 0:
+            eff_uniq_list.append(0)
+        else:
+            eff_uniq_list.append(float(l1_window_uniq_counts[ii])/sum(l1_window_uniq_counts))
     else:
         sob = uniq_fit_results[ii][4]
         sob_uniq_list.append(sob)
