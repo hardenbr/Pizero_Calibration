@@ -44,7 +44,7 @@ parser.add_option("-d", "--dataset", dest="dataset",
                   action="store",type="string",default="no_file")
 
 parser.add_option("-p", "--pickle", dest="pickle",
-                  help="name of file with pickled histogram array",
+                  help="name of file with pickled histogram array. If not specified, the histograms will be pickled and outputted",
                   action="store",type="string",default="no_file")
 
 parser.add_option("-w","--write", dest="do_write", help="write the fits and canvases",
@@ -74,6 +74,7 @@ def get_hlt_hists(tree):
     l1_uniq_hists = []
     l1_raw_hists = []
 
+    total_hist = rt.TH1F("total_hist", "total_hist", 100, .05,.25)
 
     for ii in range(N_TRIGGERS):
         u_hist = rt.TH1F("u_hist_%i" % ii,"u_hist_%i" % ii, 50, .05, .25) 
@@ -112,6 +113,12 @@ def get_hlt_hists(tree):
             print l1bits
             print "SUM BITS", sum_bits        
 
+        #fill the total tree:
+        if sum_bits >= 1:
+            for ipi in range(tree.STr2_NPi0_rec): 
+                mass = tree.STr2_mPi0_rec[ipi]
+                total_hist.Fill(mass)
+
         #if it is uniq
         if sum_bits == 1:
             #find the uniq bit
@@ -144,7 +151,7 @@ def get_hlt_hists(tree):
                         if mass < .1556 and mass > .0772:
                             l1_window_raw_counts[il1] += 1
 
-    return (l1_raw_hists, l1_uniq_hists, l1_window_uniq_counts, l1_window_raw_counts)
+    return (l1_raw_hists, l1_uniq_hists, total_hist, l1_window_uniq_counts, l1_window_raw_counts)
 
 def build_workspace_hist(tree,cut,l1num):
     #determine the events in the tree and build an iteration list
@@ -173,7 +180,7 @@ def build_workspace_hist(tree,cut,l1num):
 
     return (workspace, hist, eff)
 
-def fit_dataset(rdata,il1,eff,israw):
+def fit_dataset(rdata,il1,eff,iSamp):
 
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .10, .135,"GeV")
@@ -231,9 +238,12 @@ def fit_dataset(rdata,il1,eff,israw):
 
     #put the frame on a canvas
     canvas = None
-    if israw:
+
+    if iSamp == 0:
+        canvas = rt.TCanvas("tot_canvas_%i" % il1)
+    elif iSamp == 1:
         canvas = rt.TCanvas("r_canvas_%i" % il1)
-    else:
+    elif iSamp == 2:
         canvas = rt.TCanvas("u_canvas_%i" % il1)
 
     #make a frame
@@ -295,8 +305,10 @@ def fit_dataset(rdata,il1,eff,israw):
 #    line4 = "Efficiency %.6f" % eff
     line5 = "L1Bit #: %i" % il1
     line6 = None
-    if israw: line6 = "RAW"
-    else: line6 = "UNIQ"
+
+    if iSamp == 0: line6 = "TOTAL"
+    elif iSamp == 1: line6 = "RAW"
+    elif iSamp ==2 : line6 = "UNIQ"
     
     lat.DrawLatex(xmin,ymin,line)
     lat.DrawLatex(xmin,ymin-ypass,line2)
@@ -337,16 +349,24 @@ tree.Add(options.dataset)
 print "TOTAL NUMBER OF EVENTS IN MERGED TREES: %i" % tree.GetEntries()
 #parse the histograms corresponding the l1 bits
 
-(raw_hists, uniq_hists) = (None,None)
+(raw_hists, uniq_hists, total_hist) = (None,None)
 
 if options.pickle == "no_file":
-    (raw_hists, uniq_hists) = get_hlt_hists(tree)[0:2]
-    pickle.dump( (raw_hists, uniq_hists, l1_window_uniq_counts, l1_window_raw_counts), open( "hists_%s.p" % options.outfilename[:-5], "wb" ) )
+    (raw_hists, uniq_hists, total_hist) = get_hlt_hists(tree)[0:3]
+    pickle.dump( (raw_hists, uniq_hists, total_hist, l1_window_uniq_counts, l1_window_raw_counts), open( "hists_%s.p" % options.outfilename[:-5], "wb" ) )
 else:
-    (raw_hists, uniq_hists, l1_window_uniq_counts, l1_window_raw_counts) = pickle.load( open(options.pickle,"rb") )
+    (raw_hists, uniq_hists, total_hist, l1_window_uniq_counts, l1_window_raw_counts) = pickle.load( open(options.pickle,"rb") )
 
 uniq_fit_results = []
 raw_fit_results = []
+
+#FIT THE TOTAL HISTOGRAM FIRST
+print "DOING TOTAL FIT"
+
+total_fit_result = fit_dataset(total_hist, -99, 1, 0)
+n_s1 = total_fit_result[2]
+total_fit_result[0].Write("total_fit")
+total_fit_result[1].Write("total_frame")
 
 #scan point by point
 for il1 in range(N_TRIGGERS):
@@ -373,13 +393,13 @@ for il1 in range(N_TRIGGERS):
 
         #generate the fit result
         if n_uniq > 0:            
-            uniq_fit_result = fit_dataset(uniq_data, il1, eff, False)
+            uniq_fit_result = fit_dataset(uniq_data, il1, eff, 2)
             uniq_fit_results.append(uniq_fit_result)
         else:
             uniq_fit_results.append(0)
 
         if n_raw > 0: 
-            raw_fit_result = fit_dataset(raw_data, il1, eff, True)
+            raw_fit_result = fit_dataset(raw_data, il1, eff, 1)
             raw_fit_results.append(raw_fit_result)
         else:
             raw_fit_results.append(0)
@@ -444,7 +464,9 @@ sob_uniq_list = []
 sob_raw_list = []
 eff_uniq_list = []
 eff_raw_list = []
+s2_s1_list = []
 
+#uniq counts
 for ii in range(N_TRIGGERS):
     if uniq_fit_results[ii] == 0:
         sob_uniq_list.append(0.0)
@@ -466,9 +488,12 @@ print "SUM UNIQ", sum(l1_window_uniq_counts)
 for ii in range(N_TRIGGERS):
     if raw_fit_results[ii] == 0:
         sob_raw_list.append(0)
+        s2_s1_list.append(0)
+
         eff_raw_list.append(float(l1_window_raw_counts[ii])/sum(l1_window_raw_counts))
     else:
         sob = raw_fit_results[ii][4]
+        s2_s1_list.append(float(raw_fit_results[ii][2]) / float(n_s1))
         sob_raw_list.append(sob)
         eff_raw_list.append(float(l1_window_raw_counts[ii])/sum(l1_window_raw_counts))
 
@@ -481,6 +506,9 @@ l1_lines_stripped = map(lambda(x):x.rstrip("\n"),l1_lines)
 
 sob_uniq_hist = rt.TH1F("sob_uniq_hist","sob_uniq_hist",N_TRIGGERS,0,N_TRIGGERS)
 sob_raw_hist = rt.TH1F("sob_raw_hist","sob_raw_hist",N_TRIGGERS,0,N_TRIGGERS)
+
+s2_s1_hist = rt.TH1F("s2_s1_hist","s2_s1_hist",N_TRIGGERS,0,N_TRIGGERS)
+
 eff_uniq_hist = rt.TH1F("eff_uniq_hist","eff_uniq_hist",N_TRIGGERS,0,N_TRIGGERS)
 eff_raw_hist = rt.TH1F("eff_raw_hist","eff_raw_hist",N_TRIGGERS,0,N_TRIGGERS)
 
@@ -492,7 +520,7 @@ for ii in range(N_TRIGGERS):
     eff_raw = eff_raw_list[ii]
     if eff_raw > .01: 
         sob_raw_hist.Fill(ii,sob_raw_list[ii])
-
+        s2_s1_hist.Fill(ii, s2_s1_list[ii])
     if eff_uniq> .01:
         sob_uniq_hist.Fill(ii,sob_uniq_list[ii])
 
@@ -501,16 +529,25 @@ for ii in range(N_TRIGGERS):
 
     sob_uniq_hist.GetXaxis().SetBinLabel(1+ii,name)
     sob_raw_hist.GetXaxis().SetBinLabel(1+ii,name)
+
+    s2_s1_hist.GetXaxis().SetBinLabel(1+ii,name)
+    
     eff_uniq_hist.GetXaxis().SetBinLabel(1+ii,name)
     eff_raw_hist.GetXaxis().SetBinLabel(1+ii,name)
 
 sob_uniq_hist.GetXaxis().LabelsOption("v")
 sob_raw_hist.GetXaxis().LabelsOption("v")
+
+s2_s1_hist.GetXaxis().LabelsOption("v")
+
 eff_uniq_hist.GetXaxis().LabelsOption("v")
 eff_raw_hist.GetXaxis().LabelsOption("v")
 
 sob_uniq_hist.GetYaxis().SetTitle("S/B within 2#sigma")
 sob_raw_hist.GetYaxis().SetTitle("S/B within 2#sigma")
+
+s2_s1_hist.GetYaxis().SetTitle("S_{2}/S_{1}")
+
 eff_uniq_hist.GetYaxis().SetTitle("Efficiency within 2#sigma")
 eff_raw_hist.GetYaxis().SetTitle("Efficiency within 2#sigma")
 
