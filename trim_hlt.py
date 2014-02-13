@@ -58,9 +58,9 @@ print "reading from file", file
 # specify max events to keep in clouds 
 nev = tree.GetEntries()
 
-names = [ "STr2_NPi0_rec","STr2_Pi0recIsEB" ,"STr2_IsoPi0_rec", "STr2_n1CrisPi0_rec", "STr2_n2CrisPi0_rec", "STr2_mPi0_rec", "STr2_ptG1_rec", "STr2_ptG2_rec", "STr2_etaPi0_rec", "STr2_ptPi0_rec", "STr2_DeltaRG1G2", "STr2_Es_e1_1", "STr2_Es_e1_2","STr2_Es_e2_1", "STr2_Es_e2_2", "STr2_S4S9_1", "STr2_S4S9_2"]
-types = ["Int_t", "Int_t", "Float_t","Int_t","Int_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t"]
-postpend = ["","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]"]
+names = [ "STr2_NPi0_rec","STr2_Pi0recIsEB" ,"STr2_IsoPi0_rec", "STr2_n1CrisPi0_rec", "STr2_n2CrisPi0_rec", "STr2_mPi0_rec", "STr2_ptG1_rec", "STr2_ptG2_rec", "STr2_etaPi0_rec", "STr2_ptPi0_rec", "STr2_DeltaRG1G2", "STr2_Es_e1_1", "STr2_Es_e1_2","STr2_Es_e2_1", "STr2_Es_e2_2", "STr2_S4S9_1", "STr2_S4S9_2","L1bits"]
+types = ["Int_t", "Int_t", "Float_t","Int_t","Int_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Float_t","Int_t"]
+postpend = ["","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[5000]","[128]"]
 
 processline = " typedef struct { "
 
@@ -91,6 +91,7 @@ out_tree.Branch("STr2_Es_e2_1",pizeros.STr2_Es_e2_1,"STr2_Es_e2_1[STr2_NPi0_rec]
 out_tree.Branch("STr2_Es_e2_2",pizeros.STr2_Es_e2_2,"STr2_Es_e2_2[STr2_NPi0_rec]/F")
 out_tree.Branch("STr2_S4S9_1",pizeros.STr2_S4S9_1,"STr2_S4S9_1[STr2_NPi0_rec]/F")
 out_tree.Branch("STr2_S4S9_2",pizeros.STr2_S4S9_2,"STr2_S4S9_2[STr2_NPi0_rec]/F")
+out_tree.Branch("L1bits",pizeros.L1bits,"L1bits[128]/I")
 
 nevents = tree.Draw(">>iterlist" , "", "entrylist")
 
@@ -125,7 +126,8 @@ while iev < tree.GetEntries():
     ese2_2 = parse_array( tree.STr2_Es_e2_2, npiz)
     s4s9_1 = parse_array(tree.STr2_S4S9_1, npiz)
     s4s9_2 = parse_array(tree.STr2_S4S9_2, npiz)
-
+    l1bits = parse_array(tree.L1bits,128) 
+    
     #make alist of the arrays to iterate over
     arrays = [is_eb,iso,ncri1, ncri2, mpiz, ptg1, ptg2, eta, ptpi0, drg1g2, ese1_1, ese2_1, ese1_2, ese2_2, s4s9_1, s4s9_2]
 
@@ -154,6 +156,7 @@ while iev < tree.GetEntries():
         pizeros.STr2_Es_e2_2 = array.array("f",arrays[13])
         pizeros.STr2_S4S9_1 = array.array("f",arrays[14])
         pizeros.STr2_S4S9_2 = array.array("f",arrays[15])
+        pizeros.L1bits = array.array("i",l1bits) #fill all of the l1 bits every time
         out_tree.Fill()
  
 out_tree.Write()

@@ -40,7 +40,7 @@ parser.add_option("-n", "--nevents", dest="nevents",
                   action="store",type="int",default=-1)
 
 parser.add_option("-d", "--dataset", dest="dataset",
-                  help="list of root files containing the processesed datasets. If this is not specified, the roodataset will be generated and with the name roo(NAME).root",
+                  help="The path to the dataset to be used",
                   action="store",type="string",default="no_file")
 
 parser.add_option("-p", "--pickle", dest="pickle",
@@ -85,13 +85,13 @@ def get_hlt_hists(tree):
         l1_window_uniq_counts.append(0)
         l1_window_raw_counts.append(0)
 
+
     #loop over the tree and add it to the RooDataSet
     while iev < tree.GetEntries():
         if iev % 5000 == 0: print "Filling L1 at event...",iev
         iev += 1
         entry = itlist.Next()
         tree.GetEntry(entry)
-
         #if we restricted to a number of events
         if options.nevents == iev: break
 
@@ -110,7 +110,7 @@ def get_hlt_hists(tree):
         if options.verbose: 
             print "L1 BIT ARRAY",
             print l1bits
-            print "SUM BITS", sum_bits
+            print "SUM BITS", sum_bits        
 
         #if it is uniq
         if sum_bits == 1:
@@ -119,10 +119,11 @@ def get_hlt_hists(tree):
                 val = l1bits[il1]
                 if val == 1:  #found the bit
                     if options.verbose: print "Filling PIZEROS \n\n\n\n"
-                    #loop over pi0s in the event
+
+
+                    #loop over pi0s in the event                    
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
-
                         l1_uniq_hists[il1].Fill(mass)
                         l1_raw_hists[il1].Fill(mass)
                         
@@ -137,6 +138,7 @@ def get_hlt_hists(tree):
                 if l1bits[il1] == 1: 
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
+
                         l1_raw_hists[il1].Fill(mass)
                         #check the window
                         if mass < .1556 and mass > .0772:
@@ -314,18 +316,8 @@ tree_set = []
 sum_trees = None
 output = None
 
-#build the data workspace if there is no rooDatasets Specified
-
-dataset_file = open(options.dataset) 
-dataset_file_lines = dataset_file.readlines()
-dataset_file_lines_stripped = map(lambda(x):x.rstrip("\n"),dataset_file_lines)    
-
 #add all the trees to the tree_set
 temp_file = None
-#build the list of files
-file_set = map(lambda(x):rt.TFile(x),dataset_file_lines_stripped)
-#build the list of trees in the files
-#tree_set = map(lambda(x):x.Get("Tree_HLT"), file_set)
 rdata = None
 
 #output file containing fits and canvases
@@ -339,11 +331,11 @@ raw_fit_params_string = "@RAW##\tNSIG\tNBKG\tSOB\tCHI^2\tERR_E\tMU\tSIGMA\tMU/ER
 
 
 tree = rt.TChain("Tree_HLT")
-for f in dataset_file_lines_stripped: tree.Add(f)
+tree.Add(options.dataset)
 
 
 print "TOTAL NUMBER OF EVENTS IN MERGED TREES: %i" % tree.GetEntries()
-#prase the histograms corresponding the l1 bits
+#parse the histograms corresponding the l1 bits
 
 (raw_hists, uniq_hists) = (None,None)
 
