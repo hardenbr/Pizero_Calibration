@@ -184,7 +184,7 @@ def fit_dataset(rdata,il1,eff,iSamp):
 
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .10, .135,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .01, .0085, .02,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .01, .0085, .025,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     #t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
@@ -349,7 +349,7 @@ tree.Add(options.dataset)
 print "TOTAL NUMBER OF EVENTS IN MERGED TREES: %i" % tree.GetEntries()
 #parse the histograms corresponding the l1 bits
 
-(raw_hists, uniq_hists, total_hist) = (None,None)
+(raw_hists, uniq_hists, total_hist) = (None,None,None)
 
 if options.pickle == "no_file":
     (raw_hists, uniq_hists, total_hist) = get_hlt_hists(tree)[0:3]
@@ -493,7 +493,8 @@ for ii in range(N_TRIGGERS):
         eff_raw_list.append(float(l1_window_raw_counts[ii])/sum(l1_window_raw_counts))
     else:
         sob = raw_fit_results[ii][4]
-        s2_s1_list.append(float(raw_fit_results[ii][2]) / float(n_s1))
+        s2 = float(raw_fit_results[ii][2])
+        s2_s1_list.append(s2 / float(n_s1))
         sob_raw_list.append(sob)
         eff_raw_list.append(float(l1_window_raw_counts[ii])/sum(l1_window_raw_counts))
 
@@ -518,9 +519,13 @@ for ii in range(N_TRIGGERS):
 
     eff_uniq = eff_uniq_list[ii]
     eff_raw = eff_raw_list[ii]
+
+    if s2_s1_list[ii] > .01:
+        s2_s1_hist.Fill(ii, s2_s1_list[ii])
+
     if eff_raw > .01: 
         sob_raw_hist.Fill(ii,sob_raw_list[ii])
-        s2_s1_hist.Fill(ii, s2_s1_list[ii])
+
     if eff_uniq> .01:
         sob_uniq_hist.Fill(ii,sob_uniq_list[ii])
 
@@ -553,6 +558,8 @@ eff_raw_hist.GetYaxis().SetTitle("Efficiency within 2#sigma")
 
 sob_uniq_hist.Write()
 sob_raw_hist.Write()
+
+s2_s1_hist.Write()
 
 eff_uniq_hist.Write()
 eff_raw_hist.Write()
