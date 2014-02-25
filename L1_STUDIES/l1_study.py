@@ -52,6 +52,12 @@ parser.add_option("-w","--write", dest="do_write", help="write the fits and canv
 
 (options, args) = parser.parse_args()
 
+#read in the l1 names and prescales
+l1_file = open(options.l1file)
+l1_lines = l1_file.readlines()
+l1_lines_stripped = map(lambda(x):x.rstrip("\n"),l1_lines)
+
+
 parser.print_help()
 
 l1_window_uniq_counts = [0] #blank for zero bias
@@ -102,7 +108,7 @@ def get_hlt_hists(tree):
         if options.verbose: print "EVENT NUMBER: %i" % iev
 
         #loop over everything but zerobias
-        zerobias = l1_bits_array[0]
+        zerobias = l1bits_array[0]
 
         for ii in range(1,N_TRIGGERS):
             val = l1bits_array[ii]
@@ -118,14 +124,19 @@ def get_hlt_hists(tree):
             print l1bits
             print "SUM BITS", sum_bits        
 
-        #require zero bias to trigger in addition to each bit
-        #fill the total tree:
-        if sum_bits >= 1 and zerobias == 1:
-            for ipi in range(tree.STr2_NPi0_rec): 
-                mass = tree.STr2_mPi0_rec[ipi]
-                total_hist.Fill(mass)
+        #require zero bias
+        #fill the total tree (only requirement is zero bias fires)
+        if zerobias == 1:
+            for il1 in range(1,N_TRIGGERS):                 
+                val = l1bits[il1]
+                if val == 1:  #found the bit
+                    if options.verbose: print "Filling PIZEROS \n\n\n\n"
+                    prescale_weight = 1./float(l1_lines_stripped[il1].split()[-1]) 
+                    for ipi in range(tree.STr2_NPi0_rec): 
+                        mass = tree.STr2_mPi0_rec[ipi]
+                        total_hist.Fill(mass, prescale_weight)
 
-        #require zero bias to trigger in addition to each bit
+        #require zero bias and one additional bit
         #if it is uniq
         if sum_bits == 1 and zerobias == 1:
             #find the uniq bit
@@ -133,12 +144,11 @@ def get_hlt_hists(tree):
                 val = l1bits[il1]
                 if val == 1:  #found the bit
                     if options.verbose: print "Filling PIZEROS \n\n\n\n"
-
-                    #loop over pi0s in the event                    
+                    prescale_weight = 1./float(l1_lines_stripped[il1].split()[-1]) 
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
-                        l1_uniq_hists[il1].Fill(mass)
-                        l1_raw_hists[il1].Fill(mass)
+                        l1_uniq_hists[il1].Fill(mass, prescale_weight)
+                        l1_raw_hists[il1].Fill(mass, prescale_weight)
                         
                         #check the window
                         if mass < .1556 and mass > .0772:
@@ -146,14 +156,14 @@ def get_hlt_hists(tree):
                             l1_window_raw_counts[il1] += 1
                     break #we are done once we find the first one
 
-        #if it is raw
+        #if it is raw i.e. multiple bits fired
         if zerobias == 1 and sum_bits > 1:            
             for il1 in range(1,N_TRIGGERS):                 
+                prescale_weight = 1./float(l1_lines_stripped[il1].split()[-1])
                 if l1bits[il1] == 1: 
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
-
-                        l1_raw_hists[il1].Fill(mass)
+                        l1_raw_hists[il1].Fill(mass, prescale_weight)
                         #check the window
                         if mass < .1556 and mass > .0772:
                             l1_window_raw_counts[il1] += 1
@@ -508,9 +518,7 @@ for ii in range(1,N_TRIGGERS):
 print l1_window_raw_counts
 print "SUM RAW", sum(l1_window_raw_counts)    
 
-l1_file = open(options.l1file)
-l1_lines = l1_file.readlines()
-l1_lines_stripped = map(lambda(x):x.rstrip("\n"),l1_lines)
+
 
 sob_uniq_hist = rt.TH1F("sob_uniq_hist","sob_uniq_hist",N_TRIGGERS-1,1,N_TRIGGERS)
 sob_raw_hist = rt.TH1F("sob_raw_hist","sob_raw_hist",N_TRIGGERS-1,1,N_TRIGGERS)
