@@ -54,8 +54,8 @@ parser.add_option("-w","--write", dest="do_write", help="write the fits and canv
 
 parser.print_help()
 
-l1_window_uniq_counts = []
-l1_window_raw_counts = []
+l1_window_uniq_counts = [0] #blank for zero bias
+l1_window_raw_counts = [0]
 
 def get_hlt_hists(tree):
     print "Producing histograms for each bit"
@@ -70,13 +70,14 @@ def get_hlt_hists(tree):
     
     iev = 0
 
-    l1_trig_idx = []
-    l1_uniq_hists = []
-    l1_raw_hists = []
+    l1_trig_idx = [None]    #add a spacer for the zerobias trigger
+    l1_uniq_hists = [None]
+    l1_raw_hists = [None]
 
     total_hist = rt.TH1F("total_hist", "total_hist", 100, .05,.25)
 
-    for ii in range(N_TRIGGERS):
+    
+    for ii in range(1,N_TRIGGERS):
         u_hist = rt.TH1F("u_hist_%i" % ii,"u_hist_%i" % ii, 50, .05, .25) 
         r_hist = rt.TH1F("r_hist_%i" % ii,"r_hist_%i" % ii, 50, .05, .25) 
 
@@ -85,7 +86,6 @@ def get_hlt_hists(tree):
 
         l1_window_uniq_counts.append(0)
         l1_window_raw_counts.append(0)
-
 
     #loop over the tree and add it to the RooDataSet
     while iev < tree.GetEntries():
@@ -97,36 +97,42 @@ def get_hlt_hists(tree):
         if options.nevents == iev: break
 
         l1bits_array = tree.L1bits        
-        l1bits = []
+        l1bits = [0] #included spacer for zerobias
        
         if options.verbose: print "EVENT NUMBER: %i" % iev
-        
-        for ii in range(N_TRIGGERS):
+
+        #loop over everything but zerobias
+        zerobias = l1_bits_array[0]
+
+        for ii in range(1,N_TRIGGERS):
             val = l1bits_array[ii]
-            if options.verbose and val == 1:
+
+            if options.verbose and val == 1 and zerobias == 1:
                 print "%i array value: %f" % (ii, val)
             l1bits.append(val)
             
         sum_bits = sum(l1bits)
+        
         if options.verbose: 
             print "L1 BIT ARRAY",
             print l1bits
             print "SUM BITS", sum_bits        
 
+        #require zero bias to trigger in addition to each bit
         #fill the total tree:
-        if sum_bits >= 1:
+        if sum_bits >= 1 and zerobias == 1:
             for ipi in range(tree.STr2_NPi0_rec): 
                 mass = tree.STr2_mPi0_rec[ipi]
                 total_hist.Fill(mass)
 
+        #require zero bias to trigger in addition to each bit
         #if it is uniq
-        if sum_bits == 1:
+        if sum_bits == 1 and zerobias == 1:
             #find the uniq bit
-            for il1 in range(N_TRIGGERS):                 
+            for il1 in range(1,N_TRIGGERS):                 
                 val = l1bits[il1]
                 if val == 1:  #found the bit
                     if options.verbose: print "Filling PIZEROS \n\n\n\n"
-
 
                     #loop over pi0s in the event                    
                     for ipi in range(tree.STr2_NPi0_rec): 
@@ -139,9 +145,10 @@ def get_hlt_hists(tree):
                             l1_window_uniq_counts[il1] += 1
                             l1_window_raw_counts[il1] += 1
                     break #we are done once we find the first one
+
         #if it is raw
-        else:            
-            for il1 in range(N_TRIGGERS):                 
+        if zerobias == 1 and sum_bits > 1:            
+            for il1 in range(1,N_TRIGGERS):                 
                 if l1bits[il1] == 1: 
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
@@ -357,8 +364,8 @@ if options.pickle == "no_file":
 else:
     (raw_hists, uniq_hists, total_hist, l1_window_uniq_counts, l1_window_raw_counts) = pickle.load( open(options.pickle,"rb") )
 
-uniq_fit_results = []
-raw_fit_results = []
+uniq_fit_results = [0] #included spacer for zerobias
+raw_fit_results = [0]
 
 #FIT THE TOTAL HISTOGRAM FIRST
 print "DOING TOTAL FIT"
@@ -369,7 +376,7 @@ total_fit_result[0].Write("total_fit")
 total_fit_result[1].Write("total_frame")
 
 #scan point by point
-for il1 in range(N_TRIGGERS):
+for il1 in range(1,N_TRIGGERS):
     print "Scanning L1 Bit:", il1
 
     uniq_data = uniq_hists[il1]
@@ -460,14 +467,14 @@ for il1 in range(N_TRIGGERS):
 ##  SUMMARIZE RESULTS ##
 ########################
 
-sob_uniq_list = []
-sob_raw_list = []
-eff_uniq_list = []
-eff_raw_list = []
-s2_s1_list = []
+sob_uniq_list = [0] #included spacer for zerobias
+sob_raw_list = [0]
+eff_uniq_list = [0]
+eff_raw_list = [0]
+s2_s1_list = [0]
 
 #uniq counts
-for ii in range(N_TRIGGERS):
+for ii in range(1,N_TRIGGERS):
     if uniq_fit_results[ii] == 0:
         sob_uniq_list.append(0.0)
         if sum(l1_window_uniq_counts) == 0:
@@ -485,7 +492,7 @@ for ii in range(N_TRIGGERS):
 print l1_window_uniq_counts
 print "SUM UNIQ", sum(l1_window_uniq_counts)    
 
-for ii in range(N_TRIGGERS):
+for ii in range(1,N_TRIGGERS):
     if raw_fit_results[ii] == 0:
         sob_raw_list.append(0)
         s2_s1_list.append(0)
@@ -505,23 +512,23 @@ l1_file = open(options.l1file)
 l1_lines = l1_file.readlines()
 l1_lines_stripped = map(lambda(x):x.rstrip("\n"),l1_lines)
 
-sob_uniq_hist = rt.TH1F("sob_uniq_hist","sob_uniq_hist",N_TRIGGERS,0,N_TRIGGERS)
-sob_raw_hist = rt.TH1F("sob_raw_hist","sob_raw_hist",N_TRIGGERS,0,N_TRIGGERS)
+sob_uniq_hist = rt.TH1F("sob_uniq_hist","sob_uniq_hist",N_TRIGGERS-1,1,N_TRIGGERS)
+sob_raw_hist = rt.TH1F("sob_raw_hist","sob_raw_hist",N_TRIGGERS-1,1,N_TRIGGERS)
 
-s2_s1_hist = rt.TH1F("s2_s1_hist","s2_s1_hist",N_TRIGGERS,0,N_TRIGGERS)
+s2_s1_hist = rt.TH1F("s2_s1_hist","s2_s1_hist",N_TRIGGERS-1,1,N_TRIGGERS)
 
-eff_uniq_hist = rt.TH1F("eff_uniq_hist","eff_uniq_hist",N_TRIGGERS,0,N_TRIGGERS)
-eff_raw_hist = rt.TH1F("eff_raw_hist","eff_raw_hist",N_TRIGGERS,0,N_TRIGGERS)
+eff_uniq_hist = rt.TH1F("eff_uniq_hist","eff_uniq_hist",N_TRIGGERS-1,1,N_TRIGGERS)
+eff_raw_hist = rt.TH1F("eff_raw_hist","eff_raw_hist",N_TRIGGERS-1,1,N_TRIGGERS)
 
 #set the xaxis names
-for ii in range(N_TRIGGERS):
+for ii in range(1,N_TRIGGERS):
     name = str(ii) + ": " + l1_lines_stripped[ii]
 
     eff_uniq = eff_uniq_list[ii]
     eff_raw = eff_raw_list[ii]
 
-    if s2_s1_list[ii] > .01:
-        s2_s1_hist.Fill(ii, s2_s1_list[ii])
+    #fill every s2s1
+    s2_s1_hist.Fill(ii, s2_s1_list[ii])
 
     if eff_raw > .01: 
         sob_raw_hist.Fill(ii,sob_raw_list[ii])
@@ -532,13 +539,13 @@ for ii in range(N_TRIGGERS):
     eff_uniq_hist.Fill(ii,eff_uniq)
     eff_raw_hist.Fill(ii,eff_raw)
 
-    sob_uniq_hist.GetXaxis().SetBinLabel(1+ii,name)
-    sob_raw_hist.GetXaxis().SetBinLabel(1+ii,name)
+    sob_uniq_hist.GetXaxis().SetBinLabel(ii,name)
+    sob_raw_hist.GetXaxis().SetBinLabel(ii,name)
 
-    s2_s1_hist.GetXaxis().SetBinLabel(1+ii,name)
+    s2_s1_hist.GetXaxis().SetBinLabel(ii,name)
     
-    eff_uniq_hist.GetXaxis().SetBinLabel(1+ii,name)
-    eff_raw_hist.GetXaxis().SetBinLabel(1+ii,name)
+    eff_uniq_hist.GetXaxis().SetBinLabel(ii,name)
+    eff_raw_hist.GetXaxis().SetBinLabel(ii,name)
 
 sob_uniq_hist.GetXaxis().LabelsOption("v")
 sob_raw_hist.GetXaxis().LabelsOption("v")
