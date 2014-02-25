@@ -81,7 +81,6 @@ def get_hlt_hists(tree):
     l1_raw_hists = [None]
 
     total_hist = rt.TH1F("total_hist", "total_hist", 100, .05,.25)
-
     
     for ii in range(1,N_TRIGGERS):
         u_hist = rt.TH1F("u_hist_%i" % ii,"u_hist_%i" % ii, 50, .05, .25) 
@@ -127,14 +126,19 @@ def get_hlt_hists(tree):
         #require zero bias
         #fill the total tree (only requirement is zero bias fires)
         if zerobias == 1:
+
+            total_weight = 0
             for il1 in range(1,N_TRIGGERS):                 
                 val = l1bits[il1]
                 if val == 1:  #found the bit
                     if options.verbose: print "Filling PIZEROS \n\n\n\n"
-                    prescale_weight = 1./float(l1_lines_stripped[il1].split()[-1]) 
-                    for ipi in range(tree.STr2_NPi0_rec): 
-                        mass = tree.STr2_mPi0_rec[ipi]
-                        total_hist.Fill(mass, prescale_weight)
+                    prescale_weight = 1./float(l1_lines_stripped[il1].split()[-1]) #grab the weight
+                    total_weight += prescale_weight #add this to the total weight
+
+            #weight the masses by the total weight
+            for ipi in range(tree.STr2_NPi0_rec): 
+                mass = tree.STr2_mPi0_rec[ipi]
+                total_hist.Fill(mass, total_weight)
 
         #require zero bias and one additional bit
         #if it is uniq
@@ -201,7 +205,7 @@ def fit_dataset(rdata,il1,eff,iSamp):
 
     x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .10, .135,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .01, .0085, .025,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .01, .0085, .028,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     #t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
@@ -282,7 +286,9 @@ def fit_dataset(rdata,il1,eff,iSamp):
     #sob calculations
     n_s_sob = n_sig.getVal() * .9546
     n_b_sob = n_bkg.getVal() * bkg_scale
-    s_over_b = n_s_sob / n_b_sob 
+    s_over_b = 0
+    if n_b_sob != 0:
+        s_over_b = n_s_sob / n_b_sob 
 
     #goodness of fit
     error_e = -99
@@ -316,11 +322,16 @@ def fit_dataset(rdata,il1,eff,iSamp):
     xmin = .52
     ypass = .06
     
-    line = "S/B: %.4f #pm %.5f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
-    line2 = "reduced #chi^{2}: %.4f" % chi2
-    line3 = "#mu: %.4f, #sigma: %.4f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
-#    line4 = "Efficiency %.6f" % eff
-    line5 = "L1Bit #: %i" % il1
+    line = "S/B: %.3f #pm %.3f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
+    line2 = "reduced #chi^{2}: %.2f" % chi2
+    line3 = "#mu: %.3f, #sigma: %.3f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
+    #    line4 = "Efficiency %.6f" % eff
+
+    name = l1_lines_stripped[il1].split()[0]
+    prescale = int(l1_lines_stripped[il1].split()[-1])
+    line5 = "L1Bit (pre-scale): %i %s (%i)" % (il1, name, prescale)
+    if iSamp == 0:
+        line5 = "All L1 Bits weighted by prescales"
     line6 = None
 
     if iSamp == 0: line6 = "TOTAL"
@@ -495,10 +506,10 @@ for ii in range(1,N_TRIGGERS):
         sob = uniq_fit_results[ii][4]
         sob_uniq_list.append(sob)
         
-        print "UNIQ COUNTS ARRAY"
-        print l1_window_uniq_counts
         eff_uniq_list.append(float(l1_window_uniq_counts[ii])/sum(l1_window_uniq_counts) )
 
+print "UNIQ COUNTS ARRAY"
+print l1_window_uniq_counts
 print l1_window_uniq_counts
 print "SUM UNIQ", sum(l1_window_uniq_counts)    
 
