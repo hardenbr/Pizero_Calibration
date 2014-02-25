@@ -221,7 +221,7 @@ def fit_dataset(rdata,il1,eff,iSamp):
     bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
     
     #add the signal and the background in a model
-    tot = rdata.GetEntries()
+    tot = rdata.Integral()#GetEntries()
     window = rdata.Integral(rdata.FindBin(.09),rdata.FindBin(.15))
     print "%i TOTAL IN WINDOW: %f" % (il1,window)
 
