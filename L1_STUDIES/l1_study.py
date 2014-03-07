@@ -126,19 +126,18 @@ def get_hlt_hists(tree):
         #require zero bias
         #fill the total tree (only requirement is zero bias fires)
         if zerobias == 1:
-
             total_weight = 0
             for il1 in range(1,N_TRIGGERS):                 
                 val = l1bits[il1]
                 if val == 1:  #found the bit
                     if options.verbose: print "Filling PIZEROS \n\n\n\n"
                     prescale_weight = 1./float(l1_lines_stripped[il1].split()[-1]) #grab the weight
-                    total_weight += prescale_weight #add this to the total weight
+                    total_weight = 1 #add this to the total weight
 
             #weight the masses by the total weight
             for ipi in range(tree.STr2_NPi0_rec): 
                 mass = tree.STr2_mPi0_rec[ipi]
-                total_hist.Fill(mass, total_weight)
+                total_hist.Fill(mass)
 
         #require zero bias and one additional bit
         #if it is uniq
@@ -151,8 +150,8 @@ def get_hlt_hists(tree):
                     prescale_weight = 1./float(l1_lines_stripped[il1].split()[-1]) 
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
-                        l1_uniq_hists[il1].Fill(mass, prescale_weight)
-                        l1_raw_hists[il1].Fill(mass, prescale_weight)
+                        l1_uniq_hists[il1].Fill(mass)
+                        l1_raw_hists[il1].Fill(mass)
                         
                         #check the window
                         if mass < .1556 and mass > .0772:
@@ -167,7 +166,7 @@ def get_hlt_hists(tree):
                 if l1bits[il1] == 1: 
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
-                        l1_raw_hists[il1].Fill(mass, prescale_weight)
+                        l1_raw_hists[il1].Fill(mass)
                         #check the window
                         if mass < .1556 and mass > .0772:
                             l1_window_raw_counts[il1] += 1
@@ -203,9 +202,9 @@ def build_workspace_hist(tree,cut,l1num):
 
 def fit_dataset(rdata,il1,eff,iSamp):
 
-    x  = rt.RooRealVar("mpizero","#pi_{0} invariant mass", .05, .25,"GeV")
-    mean  = rt.RooRealVar("m","#pi_{0} peak position", .13, .10, .135,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi_{0} core #sigma", .01, .0085, .028,"GeV")
+    x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .05, .25,"GeV")
+    mean  = rt.RooRealVar("m","#pi^{0} peak position", .13, .10, .135,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .01, .0085, .028,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     #t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
