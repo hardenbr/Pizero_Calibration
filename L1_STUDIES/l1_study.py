@@ -262,6 +262,14 @@ def fit_dataset(rdata, il1, eff, iSamp):
 
     bkg_scale = (normBkg_sob / normBkg_full)
 
+    #plot points
+    t1.plotOn(frame)
+    #plot fit components
+    model.plotOn(frame, RooFit.Components("bkg"),RooFit.LineStyle(rt.kDashed),RooFit.LineColor(rt.kBlue))
+    model.plotOn(frame, RooFit.Components("gaus"),RooFit.LineColor(rt.kRed))
+    #plot the full fit
+    model.plotOn(frame)
+
 
     #put the frame on a canvas
     can_name = None
@@ -318,14 +326,6 @@ def fit_dataset(rdata, il1, eff, iSamp):
     #move to the low pad for drawing the fit
     low_pad.cd()
 
-    #plot points
-    t1.plotOn(frame)
-    #plot fit components
-    model.plotOn(frame, RooFit.Components("bkg"),RooFit.LineStyle(rt.kDashed),RooFit.LineColor(rt.kBlue))
-    model.plotOn(frame, RooFit.Components("gaus"),RooFit.LineColor(rt.kRed))
-    #plot the full fit
-    model.plotOn(frame)
-
     #draw the frame
     frame.Draw()
 
@@ -363,7 +363,7 @@ def fit_dataset(rdata, il1, eff, iSamp):
     lat.SetTextColor(1)    
 
     ymin = .65
-    xmin = .05
+    xmin = .025
     ypass = .25
     
     lat.DrawLatex(xmin,ymin, l1_line)
@@ -376,7 +376,7 @@ def fit_dataset(rdata, il1, eff, iSamp):
     big_text.SetTextSize(.55)
     big_text.SetTextColor(1)    
 
-    big_text.DrawLatex(xmin + .67, ymin-2*ypass, type_line)
+    big_text.DrawLatex(xmin + .7, ymin-1.5*ypass, type_line)
 
 
 

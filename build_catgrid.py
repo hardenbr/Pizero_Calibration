@@ -1,0 +1,400 @@
+from ROOT import gSystem, RooArgSet, RooFit
+gSystem.Load('libRooFit')
+from  optparse  import OptionParser
+import numpy as np
+import itertools, math
+import ROOT as rt
+#canvas style file
+import rootlogon
+rootlogon.style()
+#dont draw anything
+rt.gROOT.SetBatch(True)
+#dont print  any roofit output besides errors/warnings
+RooFit.PrintLevel(-1)
+RooFit.Verbose(False)
+rt.RooMsgService.instance().setGlobalKillBelow(RooFit.WARNING)
+
+class analysis:
+    def __init__(self, grid, tree):
+        self.grid = grid
+
+        self.grid_points = []  
+        self.categories = []
+        self.tree = []
+        
+    def add_category(self, eta_begin, eta_end):
+        cat = category_def(eta_begin, eta_end)
+        self.categories.append(cat)
+        
+    def initialize_grid(self):
+        if self.categories == []:
+            print " -- THERE ARE NO CATEGORIES. DEFINE BEFORE INTIALIZING GRID -- "
+            exit(1)
+
+        for ii in grid:
+            idx = grid.index(ii)
+            point = grid_point(ii, idx, self.categories)
+            self.grid_points.append(point)
+
+    def build_grid_hists(self):
+        for point in self.grid_points:
+            point.get_category_hists(self.tree)
+
+    def fit_grid_hists(self): pass
+
+#abstract class for category definition (eta ranges etc.)
+class category_def:
+
+    def __init__(self, eta_b, eta_e):
+        self.eta_b = eta_b
+        self.eta_e = eta_e
+
+#holder class for the data corresonding to a grid point
+class category_data:
+
+    def __init__(self, category_def, workspace, rdata, eff)
+        self.eta_b = eta_b
+        self.eta_e = eta_e
+        self.cat = category_def
+
+        self.workspace = workspace
+        self.rdata = rdata
+        self.eff = eff
+        
+#fundamental object of the analysis, holds the categories, cut point n the grid
+class grid_point:
+    def __init__(self, tuple, grid_id, categories):
+        self.cat_defs = categories
+        self.tuple = tuple
+        self.grid_id = grid_id
+        self.cat_data = []
+        
+    def get_category_hists(self, tree):
+        for cat in categories:
+            (workspace, rdata, eff) = build_workspace_hist(tree, tuple, cat)
+
+            cat_result = category_data(cat, workspace, rdata, eff)
+
+            self.cat_data.append(cat_resut)
+
+    def fit_category_data(self):
+        for cat in cat_data:
+
+            rdata = cat.rdata
+            eff = cat.eff
+
+            
+                        
+            
+parser = OptionParser()
+parser.add_option("-f", "--file", dest="filename",
+                  help="hlt.root file name to analyze FILE",
+                  action="store",type="string")
+
+parser.add_option("-o", "--outfile", dest="outfilename",
+                  help="tree.root file name to output",default="datatree.root",
+                  action="store",type="string")
+
+parser.add_option("-v", "--verbose", dest="verbose",
+                  help="print more information",
+                  action="store_true")
+
+parser.add_option("-n", "--nevents", dest="nevents",
+                  help="only analyze the first n events",
+                  action="store",type="int",default=-1)
+
+parser.add_option("-b", "--begin", dest="GRID_BEGIN",
+                  help="starting grid point (must specify end)",
+                  action="store",type="int",default=-1)
+
+parser.add_option("-l", "--gridlist", dest="GRID_LIST",
+                  help="txt file listing grid points to scan. Separated by linebreaks",
+                  action="store",type="string",default="no_list")
+
+parser.add_option("-e", "--end", dest="GRID_END",
+                  help="ending grid point (-1 means to the end of the grid)",
+                  action="store",type="int",default=-1)
+
+parser.add_option("-z", "--veto", dest="GRID_VETO",
+                  help="txt file listing grid scan results. The points with results will not be re-fit",
+                  action="store",type="string",default="no_list")
+
+parser.add_option("-d", "--dataset", dest="dataset",
+                  help="The Tree_HLT root file containing tree to be analyzed",
+                  action="store",type="string",default="no_file")
+
+parser.add_option("-w","--write", dest="do_write", help="write the fits and canvases",
+                                   action="store_true", default=False)
+
+(options, args) = parser.parse_args()
+
+def generate_tree_cut(cut, category):
+
+    eta_cut = "STr2_etaPi0_rec*STr2_etaPi0_rec > %f && STr2_etaPi0_rec*STr2_etaPi0_rec > %f" % (category.eta_b*category.eta_b, category.eta_e * category.eta_e)
+
+    id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
+
+    es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])    
+
+    total_cut = "(" + id_cut + ") && (" + eta_cut ")"
+
+    return total_cut
+
+
+def build_workspace_hist(tree, cut, category):
+    #determine the events in the tree and build an iteration list
+    hist_total = rt.TH1F("datahist_total","datahist_total",100,.05,.25)
+    hist = rt.TH1F("datahist","datahist",100,.05,.25)
+
+    cut_string = generate_tree_cut(cut, category)
+
+    tree.Draw("STr2_mPi0_rec>>datahist",cut_string)
+    tree.Draw("STr2_mPi0_rec>>datahist_total")
+    
+    #build the workspace
+    workspace = rt.RooWorkspace("workspace")
+
+    variables = ["mpizero[.1., .05., .25]"]
+
+    #factory all the variables
+    for v in variables: workspace.factory(v)    
+
+    #make the RooDataset
+    args = workspace.allVars()
+    data = rt.RooDataSet('PiTree','Tree of Pi0/Eta Information',args)
+
+    iev = 0
+    nselected = 0
+    ntotal = 0
+
+    #calculate the efficiency
+    eff = float(hist.GetEntries())/ float(hist_total.GetEntries())
+
+    return (workspace, hist, eff)
+
+def build_grid():
+    #cystals scan range
+    ncri1 = range(0,4)
+    ncri2 = range(0,4)
+
+    #pizero scan range
+    pi_cluster_pt = np.linspace(.4,1,4)
+    pi_pizero_pt = np.linspace(1.2,2.4,5)
+    pi_s4s9 = np.linspace(.7,.9,5)
+    pi_iso = np.linspace(.1,.3,5)
+    
+    #list the cuts together
+    pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2)
+
+    #take all possible combinations
+    pi_grid = list(itertools.product(*pizero_cuts))
+
+    return (pi_grid, eta_grid)
+
+def fit_dataset(rdata, il1, eff, iSamp):
+
+    x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .05, .25,"GeV")
+    mean  = rt.RooRealVar("m","#pi^{0} peak position", .13, .10, .135,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .01, .0085, .028,"GeV")
+    gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
+
+    #define the frame for x
+    frame = x.frame()
+
+    #t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
+    t1 = rt.RooDataHist("dh","#gamma#gamma invariant mass", rt.RooArgList(x), rdata)
+    
+    #build the background from a polynomial
+    c0 = rt.RooRealVar("c0","c0",.2,-1,1)
+    c1 = rt.RooRealVar("c1","c1",-.1,-1,1)
+    c2 = rt.RooRealVar("c2","c2",.1,-1,1)
+    c3 = rt.RooRealVar("c3","c3",-.1,-1,1)
+    c4 = rt.RooRealVar("c4","c4",.1,-1,1)
+    c5 = rt.RooRealVar("c5","c5",.1,-1,1)
+    c6 = rt.RooRealVar("c6","c6",.3,-1,1)
+
+    #using a polynomial background
+    bkg_pars = rt.RooArgList(c0,c1,c2)
+    bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
+    
+    #add the signal and the background in a model
+    tot = rdata.Integral()#GetEntries()
+    window = rdata.Integral(rdata.FindBin(.09),rdata.FindBin(.15))
+    print "%i TOTAL IN WINDOW: %f" % (il1,window)
+
+    n_sig = rt.RooRealVar("nsig","#pi^{0} yield", tot*.1,tot*.05, tot*.25)
+    n_bkg = rt.RooRealVar("nbkg","background yield",tot*.7, tot*.5, tot*.95)
+    model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
+    
+    
+    #    t1.Print()
+    nll = rt.RooNLLVar("nll","log likelihood var", model, t1, True)
+    m = rt.RooMinuit(nll)    
+    m.setPrintLevel(-1)
+
+    m.migrad()
+    
+    result = m.save()
+    #    result.Print()
+
+
+    
+    #declare the signal over background range
+    x.setRange("sobRange",mean.getVal()-2.*sigma.getVal(), mean.getVal()+2.*sigma.getVal())
+    x.setRange("FULL",.05,.25)
+
+    #calculate integrals
+    integralBkg_sob = bkg.createIntegral(rt.RooArgSet(x),RooFit.NormSet(rt.RooArgSet(x)),RooFit.Range("sobRange"))
+    integralBkg_full = bkg.createIntegral(rt.RooArgSet(x),RooFit.NormSet(rt.RooArgSet(x)),RooFit.Range("FULL"))
+    
+    normBkg_sob = integralBkg_sob.getVal()
+    normBkg_full = integralBkg_full.getVal()
+
+    bkg_scale = (normBkg_sob / normBkg_full)
+
+    #plot points
+    t1.plotOn(frame)
+    #plot fit components
+    model.plotOn(frame, RooFit.Components("bkg"),RooFit.LineStyle(rt.kDashed),RooFit.LineColor(rt.kBlue))
+    model.plotOn(frame, RooFit.Components("gaus"),RooFit.LineColor(rt.kRed))
+    #plot the full fit
+    model.plotOn(frame)
+
+
+    #put the frame on a canvas
+    can_name = None
+
+    if iSamp == 0:
+        can_name = "tot_canvas%i" % il1
+    elif iSamp == 1:
+        can_name = "r_canvas_%i" % il1
+    elif iSamp == 2:
+        can_name = "u_canvas_%i" % il1
+
+    canvas = rt.TCanvas(can_name,can_name,1000,900)
+    ####compute the interesting values
+
+    #sob calculations
+    n_s_sob = n_sig.getVal() * .9546
+    n_b_sob = n_bkg.getVal() * bkg_scale
+    s_over_b = 0
+    if n_b_sob != 0:
+        s_over_b = n_s_sob / n_b_sob 
+
+    #goodness of fit
+    error_e = -99
+    if n_sig.getVal() > 0 and n_bkg.getVal() > 0:
+        error_e = s_over_b * math.sqrt(math.pow(n_sig.getError() / n_sig.getVal(), 2) + math.pow(n_bkg.getError() / n_bkg.getVal(), 2))
+        
+    chi2 = frame.chiSquare()
+    
+    #signal calculations
+    mean_val = mean.getVal()
+    sigma_val = sigma.getVal()
+    mu_over_err = mean.getVal() / mean.getError()
+    
+    if options.verbose:
+        result.Print()    
+        print "normBkg_sob", normBkg_sob
+        print "normBkg_full", normBkg_full
+        print "signal",n_s_sob,"bkg", n_b_sob
+        print "sob:", s_over_b
+        print "chi^2:", chi2
+        print "error_e:", error_e
+
+    #move to the higher canvas
+    canvas.cd()
+
+    #low pad for drawing the fit
+
+
+    low_pad = rt.TPad("low_pad", "low_pad", 0, 0, 1, 0.8);
+    low_pad.SetTopMargin(.05)
+    low_pad.SetBottomMargin(.2)
+    low_pad.Draw()
+
+    #move to the low pad for drawing the fit
+    low_pad.cd()
+
+    #draw the frame
+    frame.Draw()
+
+    canvas.cd()
+    #write the latex onto the canvas
+    high_pad =  rt.TPad("top_pad","top_pad",0,0.8,1,1)
+    high_pad.SetTopMargin(0)
+    high_pad.SetBottomMargin(.4)
+
+    high_pad.Draw()    
+    high_pad.cd()
+
+    sob_line = "S/B: %.3f #pm %.3f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
+    chi_sq_line = "reduced #chi^{2}: %.2f" % chi2
+    gaus_line = "#mu: %.3f, #sigma: %.3f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
+    #    line4 = "Efficiency %.6f" % eff
+
+    name = l1_lines_stripped[il1].split()[0]
+    prescale = int(l1_lines_stripped[il1].split()[-1])
+    l1_line = "L1Bit (pre-scale): %i %s (%i)" % (il1, name, prescale)
+
+    if iSamp == 0:
+        l1_line = "Total Fit of All L1 Bits"
+
+    type_line = None
+
+    if iSamp == 0: type_line = "TOT"
+    elif iSamp == 1: type_line = "RAW"
+    elif iSamp == 2: type_line = "UNIQ"
+
+    lat = rt.TLatex()
+    lat.SetNDC()
+    lat.SetTextFont(42)
+    lat.SetTextSize(.2)
+    lat.SetTextColor(1)    
+
+    ymin = .65
+    xmin = .025
+    ypass = .25
+    
+    lat.DrawLatex(xmin,ymin, l1_line)
+    lat.DrawLatex(xmin,ymin-ypass, sob_line)
+    lat.DrawLatex(xmin,ymin-2*ypass, chi_sq_line + " " + gaus_line)
+
+    big_text = rt.TLatex()
+    big_text.SetNDC()
+    big_text.SetTextFont(42)
+    big_text.SetTextSize(.55)
+    big_text.SetTextColor(1)    
+
+    big_text.DrawLatex(xmin + .7, ymin-1.5*ypass, type_line)
+
+
+
+ 
+    return (result, canvas, n_s_sob, n_b_sob, s_over_b, chi2, error_e, mean_val, sigma_val, mu_over_err, eff)
+
+
+#################
+## MAIN METHOD ##
+##             ## 
+#################
+
+file = rt.TFile(options.file)
+tree = file.Get("Tree_HLT")
+
+grid = build_grid()
+
+#build the analysis from the grid and tree data
+analysis = analysis(grid, tree)
+
+#define the categories
+analysis.add_category(0, 1.4442)
+
+#initialize the grid points
+analysis.initialize_grid()
+
+#build the histograms for each category at each grid point
+analysis.build_grid_hists()
+
+#fit the histograms
+analysis.fit_grid_hists()
