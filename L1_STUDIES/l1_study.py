@@ -125,7 +125,7 @@ def get_hlt_hists(tree):
 
         #require zero bias
         #fill the total tree (only requirement is zero bias fires)
-        if zerobias == 1:
+        if zerobias == 1 and sum_bits >= 1:
             total_weight = 0
             for il1 in range(1,N_TRIGGERS):                 
                 val = l1bits[il1]
@@ -151,7 +151,8 @@ def get_hlt_hists(tree):
                     for ipi in range(tree.STr2_NPi0_rec): 
                         mass = tree.STr2_mPi0_rec[ipi]
                         l1_uniq_hists[il1].Fill(mass)
-                        l1_raw_hists[il1].Fill(mass)
+
+                        l1_raw_hists[il1].Fill(mass) ##MAKE SURE TO FILL THE RAW
                         
                         #check the window
                         if mass < .1556 and mass > .0772:
@@ -200,12 +201,15 @@ def build_workspace_hist(tree,cut,l1num):
 
     return (workspace, hist, eff)
 
-def fit_dataset(rdata,il1,eff,iSamp):
+def fit_dataset(rdata, il1, eff, iSamp):
 
     x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi^{0} peak position", .13, .10, .135,"GeV")
     sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .01, .0085, .028,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
+
+    #define the frame for x
+    frame = x.frame()
 
     #t1 = rdata.reduce("mpizero < .25 && mpizero > .05")
     t1 = rt.RooDataHist("dh","#gamma#gamma invariant mass", rt.RooArgList(x), rdata)
@@ -242,6 +246,8 @@ def fit_dataset(rdata,il1,eff,iSamp):
     
     result = m.save()
     #    result.Print()
+
+
     
     #declare the signal over background range
     x.setRange("sobRange",mean.getVal()-2.*sigma.getVal(), mean.getVal()+2.*sigma.getVal())
@@ -256,30 +262,18 @@ def fit_dataset(rdata,il1,eff,iSamp):
 
     bkg_scale = (normBkg_sob / normBkg_full)
 
+
     #put the frame on a canvas
-    canvas = None
+    can_name = None
 
     if iSamp == 0:
-        canvas = rt.TCanvas("tot_canvas_%i" % il1)
+        can_name = "tot_canvas%i" % il1
     elif iSamp == 1:
-        canvas = rt.TCanvas("r_canvas_%i" % il1)
+        can_name = "r_canvas_%i" % il1
     elif iSamp == 2:
-        canvas = rt.TCanvas("u_canvas_%i" % il1)
+        can_name = "u_canvas_%i" % il1
 
-    #make a frame
-    frame = x.frame()
-
-    #plot points
-    t1.plotOn(frame)
-    #plot fit components
-    model.plotOn(frame, RooFit.Components("bkg"),RooFit.LineStyle(rt.kDashed),RooFit.LineColor(rt.kBlue))
-    model.plotOn(frame, RooFit.Components("gaus"),RooFit.LineColor(rt.kRed))
-    #plot the full fit
-    model.plotOn(frame)
-
-    #draw the frame
-    frame.Draw()
-
+    canvas = rt.TCanvas(can_name,can_name,1000,900)
     ####compute the interesting values
 
     #sob calculations
@@ -310,39 +304,82 @@ def fit_dataset(rdata,il1,eff,iSamp):
         print "chi^2:", chi2
         print "error_e:", error_e
 
+    #move to the higher canvas
+    canvas.cd()
+
+    #low pad for drawing the fit
+
+
+    low_pad = rt.TPad("low_pad", "low_pad", 0, 0, 1, 0.8);
+    low_pad.SetTopMargin(.05)
+    low_pad.SetBottomMargin(.2)
+    low_pad.Draw()
+
+    #move to the low pad for drawing the fit
+    low_pad.cd()
+
+    #plot points
+    t1.plotOn(frame)
+    #plot fit components
+    model.plotOn(frame, RooFit.Components("bkg"),RooFit.LineStyle(rt.kDashed),RooFit.LineColor(rt.kBlue))
+    model.plotOn(frame, RooFit.Components("gaus"),RooFit.LineColor(rt.kRed))
+    #plot the full fit
+    model.plotOn(frame)
+
+    #draw the frame
+    frame.Draw()
+
+    canvas.cd()
     #write the latex onto the canvas
-    lat = rt.TLatex()
-    lat.SetNDC()
-    lat.SetTextFont(42)
-    lat.SetTextSize(.04)
-    lat.SetTextColor(1)
-    
-    ymin = .91
-    xmin = .52
-    ypass = .06
-    
-    line = "S/B: %.3f #pm %.3f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
-    line2 = "reduced #chi^{2}: %.2f" % chi2
-    line3 = "#mu: %.3f, #sigma: %.3f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
+    high_pad =  rt.TPad("top_pad","top_pad",0,0.8,1,1)
+    high_pad.SetTopMargin(0)
+    high_pad.SetBottomMargin(.4)
+
+    high_pad.Draw()    
+    high_pad.cd()
+
+    sob_line = "S/B: %.3f #pm %.3f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
+    chi_sq_line = "reduced #chi^{2}: %.2f" % chi2
+    gaus_line = "#mu: %.3f, #sigma: %.3f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
     #    line4 = "Efficiency %.6f" % eff
 
     name = l1_lines_stripped[il1].split()[0]
     prescale = int(l1_lines_stripped[il1].split()[-1])
-    line5 = "L1Bit (pre-scale): %i %s (%i)" % (il1, name, prescale)
-    if iSamp == 0:
-        line5 = "All L1 Bits weighted by prescales"
-    line6 = None
+    l1_line = "L1Bit (pre-scale): %i %s (%i)" % (il1, name, prescale)
 
-    if iSamp == 0: line6 = "TOTAL"
-    elif iSamp == 1: line6 = "RAW"
-    elif iSamp ==2 : line6 = "UNIQ"
+    if iSamp == 0:
+        l1_line = "Total Fit of All L1 Bits"
+
+    type_line = None
+
+    if iSamp == 0: type_line = "TOT"
+    elif iSamp == 1: type_line = "RAW"
+    elif iSamp == 2: type_line = "UNIQ"
+
+    lat = rt.TLatex()
+    lat.SetNDC()
+    lat.SetTextFont(42)
+    lat.SetTextSize(.2)
+    lat.SetTextColor(1)    
+
+    ymin = .65
+    xmin = .05
+    ypass = .25
     
-    lat.DrawLatex(xmin,ymin,line)
-    lat.DrawLatex(xmin,ymin-ypass,line2)
-    lat.DrawLatex(xmin,ymin-2*ypass,line3)
- #   lat.DrawLatex(xmin,ymin-3*ypass,line4)
-    lat.DrawLatex(xmin,ymin-3*ypass,line5)
-    lat.DrawLatex(xmin,ymin-4*ypass,line6)
+    lat.DrawLatex(xmin,ymin, l1_line)
+    lat.DrawLatex(xmin,ymin-ypass, sob_line)
+    lat.DrawLatex(xmin,ymin-2*ypass, chi_sq_line + " " + gaus_line)
+
+    big_text = rt.TLatex()
+    big_text.SetNDC()
+    big_text.SetTextFont(42)
+    big_text.SetTextSize(.55)
+    big_text.SetTextColor(1)    
+
+    big_text.DrawLatex(xmin + .67, ymin-2*ypass, type_line)
+
+
+
  
     return (result, canvas, n_s_sob, n_b_sob, s_over_b, chi2, error_e, mean_val, sigma_val, mu_over_err, eff)
 
