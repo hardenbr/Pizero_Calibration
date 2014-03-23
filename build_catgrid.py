@@ -2,7 +2,7 @@ from ROOT import gSystem, RooArgSet, RooFit
 gSystem.Load('libRooFit')
 from  optparse  import OptionParser
 import numpy as np
-import itertools, math
+import itertools, math, pickle
 import ROOT as rt
 #canvas style file
 import rootlogon
@@ -20,7 +20,7 @@ class analysis:
 
         self.grid_points = []  
         self.categories = []
-        self.tree = []
+        self.tree = tree
         
     def add_category(self, eta_begin, eta_end):
         cat = category_def(eta_begin, eta_end)
@@ -31,18 +31,65 @@ class analysis:
             print " -- THERE ARE NO CATEGORIES. DEFINE BEFORE INTIALIZING GRID -- "
             exit(1)
 
-        for ii in grid:
+        print "-- Initializing Grid --"
+        for ii in self.grid:                        
             idx = grid.index(ii)
+
             point = grid_point(ii, idx, self.categories)
             self.grid_points.append(point)
 
     def build_grid_hists(self):
+
+        print "-- Building Grid Histograms --"
+
         for point in self.grid_points:
+
+            if point.grid_id % 100 == 0: print "-- Scanning Grid Point %i --" % point.grid_id
             point.get_category_hists(self.tree)
 
-    def fit_grid_hists(self): pass
+    def fit_grid_hists(self):
 
-#abstract class for category definition (eta ranges etc.)
+        for point in self.grid_points:
+            if point.grid_id % 100 == 0: print "-- Fitting Grid Point %i --" % point.grid_id
+            point.fit_category_data()
+
+    def save_category_data(self, outfile):
+        outfile.cd()
+
+        for point in self.grid_points:
+            for cat in point.cat_data:
+
+                #write the histgram for the category
+                cat.rdata.Write()
+
+                fit_result = cat.fit_result
+
+                #write the canvas for tehc category
+                fit_result.canvas.Write()
+
+    #store all the hard work in a histogram
+    def pickle_hists(self, pickle_out):
+        
+        pickle.dump(self.grid_points, open(pickle_out, "wb"))
+        
+
+    #unpack multiple files of histograms and merge them                 
+    def un_pickle_list(self, file_list):
+        file = open(file_list,"r")
+        lines = map(lambda x: x.rstrip("\n"), file.readlines())
+
+        file_points = []
+
+        #merge all the points into a single list
+        for ll in lines:
+            points = pickle.load(open(ll,"rb"))
+            for point in points:
+                file_points.append(point)
+
+        #re-assign the points to the analysis object
+        self.grid_points = file_points
+        
+#abstract class for category definition (eta ranges, maybe more later)
 class category_def:
 
     def __init__(self, eta_b, eta_e):
@@ -52,14 +99,21 @@ class category_def:
 #holder class for the data corresonding to a grid point
 class category_data:
 
-    def __init__(self, category_def, workspace, rdata, eff)
-        self.eta_b = eta_b
-        self.eta_e = eta_e
+    def __init__(self, category_def, workspace, rdata, eff):
+        self.eta_b = category_def.eta_b
+        self.eta_e = category_def.eta_e
         self.cat = category_def
 
         self.workspace = workspace
         self.rdata = rdata
         self.eff = eff
+
+        self.fit_result = None
+
+#container for a fit result
+class fit_result:
+    def __init__(self, result, canvas, n_s, n_b, sob, chi2, error_e, mean_val, sigma, mu_over_error, eff):
+        self.result, self.canvas, self.ns, self.nb, self.sob, self.chi2, self.error_e, self.mean_val, self.sigma, self.mu_over_error, self.eff =  result, canvas, n_s, n_b, sob, chi2, error_e, mean_val, sigma, mu_over_error, eff 
         
 #fundamental object of the analysis, holds the categories, cut point n the grid
 class grid_point:
@@ -68,22 +122,26 @@ class grid_point:
         self.tuple = tuple
         self.grid_id = grid_id
         self.cat_data = []
-        
+
+    #for each category extract the histogram characterizing the cut
     def get_category_hists(self, tree):
-        for cat in categories:
-            (workspace, rdata, eff) = build_workspace_hist(tree, tuple, cat)
+        for cat in self.cat_defs:
+            (workspace, rdata, eff) = build_workspace_hist(tree, self.tuple, self.grid_id, cat)
 
             cat_result = category_data(cat, workspace, rdata, eff)
 
-            self.cat_data.append(cat_resut)
+            self.cat_data.append(cat_result)
 
+    #fit each category for this grid point using the histogram stored previously
     def fit_category_data(self):
-        for cat in cat_data:
+        for cat in self.cat_data:
 
             rdata = cat.rdata
             eff = cat.eff
-
             
+            result = fit_dataset(rdata, self.grid_id, eff, 0, cat)
+
+            cat.fit_result = result
                         
             
 parser = OptionParser()
@@ -123,6 +181,10 @@ parser.add_option("-d", "--dataset", dest="dataset",
                   help="The Tree_HLT root file containing tree to be analyzed",
                   action="store",type="string",default="no_file")
 
+parser.add_option("-p", "--pickle", dest="pickle",
+                  help="name of .txt file listing pickled histogram data. If not specified, the histograms will be pickled and outputted",
+                  action="store",type="string",default="no_file")
+
 parser.add_option("-w","--write", dest="do_write", help="write the fits and canvases",
                                    action="store_true", default=False)
 
@@ -130,26 +192,36 @@ parser.add_option("-w","--write", dest="do_write", help="write the fits and canv
 
 def generate_tree_cut(cut, category):
 
-    eta_cut = "STr2_etaPi0_rec*STr2_etaPi0_rec > %f && STr2_etaPi0_rec*STr2_etaPi0_rec > %f" % (category.eta_b*category.eta_b, category.eta_e * category.eta_e)
+    eta_cut = "(STr2_etaPi0_rec*STr2_etaPi0_rec) > %f && (STr2_etaPi0_rec*STr2_etaPi0_rec) < %f" % (category.eta_b*category.eta_b, category.eta_e * category.eta_e)
 
     id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
 
-    es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])    
+    #    es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])    
 
-    total_cut = "(" + id_cut + ") && (" + eta_cut ")"
+    total_cut = "(" + id_cut + ") && (" + eta_cut + ")"
+
+    print total_cut
 
     return total_cut
 
 
-def build_workspace_hist(tree, cut, category):
+def build_workspace_hist(tree, cut, grid_id, category):
+
+    print "-- Building workspace hist ", grid_id, "--"
+
     #determine the events in the tree and build an iteration list
     hist_total = rt.TH1F("datahist_total","datahist_total",100,.05,.25)
-    hist = rt.TH1F("datahist","datahist",100,.05,.25)
+
+    name = "datahist_%i_%2.2f_%2.2f" % (grid_id, category.eta_b, category.eta_e)
+    hist = rt.TH1F(name, name, 100, .05, .25)
 
     cut_string = generate_tree_cut(cut, category)
 
-    tree.Draw("STr2_mPi0_rec>>datahist",cut_string)
+    tree.Draw("STr2_mPi0_rec>>%s" % name ,cut_string)
     tree.Draw("STr2_mPi0_rec>>datahist_total")
+
+    print "TOTAL HIST", hist_total.Integral()
+    print "SELECTED HIST", hist.Integral()
     
     #build the workspace
     workspace = rt.RooWorkspace("workspace")
@@ -189,9 +261,9 @@ def build_grid():
     #take all possible combinations
     pi_grid = list(itertools.product(*pizero_cuts))
 
-    return (pi_grid, eta_grid)
+    return pi_grid
 
-def fit_dataset(rdata, il1, eff, iSamp):
+def fit_dataset(rdata, il1, eff, iSamp, cat):
 
     x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi^{0} peak position", .13, .10, .135,"GeV")
@@ -237,7 +309,6 @@ def fit_dataset(rdata, il1, eff, iSamp):
     result = m.save()
     #    result.Print()
 
-
     
     #declare the signal over background range
     x.setRange("sobRange",mean.getVal()-2.*sigma.getVal(), mean.getVal()+2.*sigma.getVal())
@@ -264,12 +335,7 @@ def fit_dataset(rdata, il1, eff, iSamp):
     #put the frame on a canvas
     can_name = None
 
-    if iSamp == 0:
-        can_name = "tot_canvas%i" % il1
-    elif iSamp == 1:
-        can_name = "r_canvas_%i" % il1
-    elif iSamp == 2:
-        can_name = "u_canvas_%i" % il1
+    if iSamp == 0: can_name = "grid_canvas%i_cat_%2.2f_%2.2f" % (il1, cat.eta_b, cat.eta_e)
 
     canvas = rt.TCanvas(can_name,can_name,1000,900)
     ####compute the interesting values
@@ -329,22 +395,17 @@ def fit_dataset(rdata, il1, eff, iSamp):
     high_pad.cd()
 
     sob_line = "S/B: %.3f #pm %.3f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
-    chi_sq_line = "reduced #chi^{2}: %.2f" % chi2
+    chi_sq_line = "reduced #chi^{2}: %.2f," % chi2
     gaus_line = "#mu: %.3f, #sigma: %.3f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
     #    line4 = "Efficiency %.6f" % eff
 
-    name = l1_lines_stripped[il1].split()[0]
-    prescale = int(l1_lines_stripped[il1].split()[-1])
-    l1_line = "L1Bit (pre-scale): %i %s (%i)" % (il1, name, prescale)
-
+    l1_line = ""
     if iSamp == 0:
-        l1_line = "Total Fit of All L1 Bits"
+        l1_line = "Grid Point # %i  Category: %2.2f < |#eta| < %2.2f" % (il1, cat.eta_b, cat.eta_e)
 
     type_line = None
 
     if iSamp == 0: type_line = "TOT"
-    elif iSamp == 1: type_line = "RAW"
-    elif iSamp == 2: type_line = "UNIQ"
 
     lat = rt.TLatex()
     lat.SetNDC()
@@ -368,10 +429,9 @@ def fit_dataset(rdata, il1, eff, iSamp):
 
     big_text.DrawLatex(xmin + .7, ymin-1.5*ypass, type_line)
 
-
-
+    fit_res = fit_result(result, canvas, n_s_sob, n_b_sob, s_over_b, chi2, error_e, mean_val, sigma_val, mu_over_err, eff)
  
-    return (result, canvas, n_s_sob, n_b_sob, s_over_b, chi2, error_e, mean_val, sigma_val, mu_over_err, eff)
+    return fit_res
 
 
 #################
@@ -379,22 +439,48 @@ def fit_dataset(rdata, il1, eff, iSamp):
 ##             ## 
 #################
 
-file = rt.TFile(options.file)
+file = rt.TFile(options.filename)
 tree = file.Get("Tree_HLT")
 
+outfile = rt.TFile(options.outfilename, "RECREATE")
+
 grid = build_grid()
+ntot = len(grid)
+
+#trim the grid down if necessary
+p1 = options.GRID_BEGIN
+p2 = options.GRID_END
+if p1 != -1 and p2 != -1:
+    grid = grid[p1:p2]
+ntrim = len(grid)
+
+print "-- Analyzing # %i of total %i points -- " % (ntrim, ntot)
 
 #build the analysis from the grid and tree data
 analysis = analysis(grid, tree)
 
 #define the categories
-analysis.add_category(0, 1.4442)
-
+analysis.add_category(0, 1)
+analysis.add_category(1, 1.2)
+analysis.add_category(1.2, 1.4442)
 #initialize the grid points
 analysis.initialize_grid()
 
 #build the histograms for each category at each grid point
-analysis.build_grid_hists()
+if options.pickle == "no_file":
+    #build the histograms
+    analysis.build_grid_hists()
+
+    #build the name for the new pickle object
+    pickle_out = options.outfilename[:-5] + "_hists_%i_%i.p" % (p1, p2)
+
+    #store the histograms
+    analysis.pickle_hists(pickle_out)
+else:
+    analysis.un_pickle_list(options.pickle)
 
 #fit the histograms
 analysis.fit_grid_hists()
+
+#save the output
+analysis.save_category_data(outfile)
