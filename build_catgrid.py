@@ -1,3 +1,4 @@
+
 from ROOT import gSystem, RooArgSet, RooFit
 gSystem.Load('libRooFit')
 from  optparse  import OptionParser
@@ -15,12 +16,14 @@ RooFit.Verbose(False)
 rt.RooMsgService.instance().setGlobalKillBelow(RooFit.WARNING)
 
 class analysis:
-    def __init__(self, grid, tree):
+    def __init__(self, grid, tree, p1, p2):
         self.grid = grid
 
         self.grid_points = []  
         self.categories = []
         self.tree = tree
+        self.p1 = p1
+        self.p2 = p2
         
     def add_category(self, eta_begin, eta_end):
         cat = category_def(eta_begin, eta_end)
@@ -33,9 +36,18 @@ class analysis:
 
         print "-- Initializing Grid --"
         for ii in self.grid:                        
-            idx = grid.index(ii)
+            idx = self.p1 + grid.index(ii)
 
+            if self.p1 == -1:                
+                idx = grid.index(ii)
+
+            if idx > self.p2 and self.p2 != -1:
+                print "\nANALYSIS HAS LEFT BOUND OF GRID POINTS\n"
+                exit(1)
+
+            #build the grid point
             point = grid_point(ii, idx, self.categories)
+
             self.grid_points.append(point)
 
     def build_grid_hists(self):
@@ -50,9 +62,15 @@ class analysis:
     def fit_grid_hists(self):
 
         for point in self.grid_points:
-            if point.grid_id % 100 == 0: print "-- Fitting Grid Point %i --" % point.grid_id
             point.fit_category_data()
 
+        print "-- Fitting Complete --"
+
+    def clear_fit_results(self):
+
+        for point in self.grid_points:
+            point.clear_fit()
+            
     def save_category_data(self, outfile):
         outfile.cd()
 
@@ -80,10 +98,14 @@ class analysis:
 
         file_points = []
 
+        print "-- Unpickling points from pickle list --"
+
         #merge all the points into a single list
         for ll in lines:
-            points = pickle.load(open(ll,"rb"))
-            for point in points:
+            pickled_points = pickle.load(open(ll,"rb"))
+            for point in pickled_points:
+                print "grid id:", point.grid_id
+            
                 file_points.append(point)
 
         #re-assign the points to the analysis object
@@ -123,6 +145,10 @@ class grid_point:
         self.grid_id = grid_id
         self.cat_data = []
 
+    def clear_fit(self):
+        self.cat_data.fit_result = None
+        self.cat_data.workspace = None            
+
     #for each category extract the histogram characterizing the cut
     def get_category_hists(self, tree):
         for cat in self.cat_defs:
@@ -138,8 +164,10 @@ class grid_point:
 
             rdata = cat.rdata
             eff = cat.eff
+
+            print "\n-- Fitting Grid Point %i Category: (%f, %f) --\n" % (self.grid_id, cat.eta_b, cat.eta_e)
             
-            result = fit_dataset(rdata, self.grid_id, eff, 0, cat)
+            result = fit_dataset(rdata, self.grid_id, eff, 0, cat, self.tuple)
 
             cat.fit_result = result
                         
@@ -246,14 +274,14 @@ def build_workspace_hist(tree, cut, grid_id, category):
 
 def build_grid():
     #cystals scan range
-    ncri1 = range(0,4)
-    ncri2 = range(0,4)
+    ncri1 = range(0, 4)
+    ncri2 = range(0, 4)
 
     #pizero scan range
-    pi_cluster_pt = np.linspace(.4,1,4)
-    pi_pizero_pt = np.linspace(1.2,2.4,5)
-    pi_s4s9 = np.linspace(.7,.9,5)
-    pi_iso = np.linspace(.1,.3,5)
+    pi_cluster_pt = np.linspace(.4, 1, 3)
+    pi_pizero_pt = np.linspace(1.2, 2.4, 3)
+    pi_s4s9 = np.linspace(.7, .9, 3)
+    pi_iso = np.linspace(.1, .3, 3)
     
     #list the cuts together
     pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2)
@@ -263,7 +291,7 @@ def build_grid():
 
     return pi_grid
 
-def fit_dataset(rdata, il1, eff, iSamp, cat):
+def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 
     x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi^{0} peak position", .13, .10, .135,"GeV")
@@ -397,6 +425,7 @@ def fit_dataset(rdata, il1, eff, iSamp, cat):
     sob_line = "S/B: %.3f #pm %.3f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
     chi_sq_line = "reduced #chi^{2}: %.2f," % chi2
     gaus_line = "#mu: %.3f, #sigma: %.3f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
+    cut_line = "p_{t,#gamma} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i" % cut
     #    line4 = "Efficiency %.6f" % eff
 
     l1_line = ""
@@ -405,21 +434,22 @@ def fit_dataset(rdata, il1, eff, iSamp, cat):
 
     type_line = None
 
-    if iSamp == 0: type_line = "TOT"
+    if iSamp == 0: type_line = "SEL"
 
     lat = rt.TLatex()
     lat.SetNDC()
     lat.SetTextFont(42)
-    lat.SetTextSize(.2)
+    lat.SetTextSize(.19)
     lat.SetTextColor(1)    
 
-    ymin = .65
+    ymin = .8
     xmin = .025
-    ypass = .25
+    ypass = .23
     
     lat.DrawLatex(xmin,ymin, l1_line)
     lat.DrawLatex(xmin,ymin-ypass, sob_line)
     lat.DrawLatex(xmin,ymin-2*ypass, chi_sq_line + " " + gaus_line)
+    lat.DrawLatex(xmin,ymin-3*ypass, cut_line)
 
     big_text = rt.TLatex()
     big_text.SetNDC()
@@ -451,18 +481,19 @@ ntot = len(grid)
 p1 = options.GRID_BEGIN
 p2 = options.GRID_END
 if p1 != -1 and p2 != -1:
-    grid = grid[p1:p2]
+    grid = grid[p1:p2+1]
 ntrim = len(grid)
 
 print "-- Analyzing # %i of total %i points -- " % (ntrim, ntot)
 
 #build the analysis from the grid and tree data
-analysis = analysis(grid, tree)
+analysis = analysis(grid, tree, p1, p2)
 
 #define the categories
-analysis.add_category(0, 1)
-analysis.add_category(1, 1.2)
-analysis.add_category(1.2, 1.4442)
+analysis.add_category(0, .5)
+analysis.add_category(.5, 1)
+#analysis.add_category(1.2, 1.4442)
+
 #initialize the grid points
 analysis.initialize_grid()
 
