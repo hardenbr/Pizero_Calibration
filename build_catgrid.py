@@ -1,4 +1,4 @@
-from ROOT import gSystem, RooArgSet, RooFit
+from ROOT import gSystem, RooArgSet, RooFit, AddressOf, gROOT
 gSystem.Load('libRooFit')
 from  optparse  import OptionParser
 import numpy as np
@@ -111,7 +111,21 @@ class analysis:
     #build a plot of sob vs s for each category 
     def build_sob_vs_s(self, outfile):
 
+        
+        gROOT.ProcessLine("struct MyStruct{ Float_t s; Float_t b; Float_t sob; Int_t cat; Int_t gid;};")
+
+        s = rt.MyStruct()
+
         outfile.cd()
+
+        tree = rt.TTree("sob_tree", "sob info")
+
+        tree.Branch("ns",AddressOf(s, "s"), "ns/F")
+        tree.Branch("nb",AddressOf(s, "b"), "nb/F")
+        tree.Branch("sob",AddressOf(s, "sob"), "sob/F")
+        tree.Branch("gid",AddressOf(s, "gid"), "gid/I")
+        tree.Branch("cat",AddressOf(s, "cat"), "cat/I")
+
         hist_list = []
 
         n_cats = len(self.categories)
@@ -124,19 +138,16 @@ class analysis:
 
                 fit_res = cat.fit_result
 
-                sob = fit_res.sob
-                ns = fit_res.ns
+                #assign values
+                s.cat = cc
+                s.gid = id
+                s.sob = fit_res.sob
+                s.ns = fit_res.ns
+                s.nb = fit_res.nb
+                
+                tree.Fill()
 
-                bin = hist_cc.FindBin(ns,sob)
-
-                content = hist_cc.GetBinContent(bin)
-
-                if content == 0:
-                    hist_cc.Fill(ns, sob, id)
-            
-            hist_list.append(hist_cc)
-
-        for hist in hist_list: hist.Write()
+        tree.Write()
         
 #abstract class for category definition (eta ranges, maybe more later)
 class category_def:
@@ -265,7 +276,7 @@ def build_workspace_hist(tree, cut, grid_id, category):
     print "-- Building workspace hist ", grid_id, "--"
 
     #determine the events in the tree and build an iteration list
-    hist_total = rt.TH1F("datahist_total","datahist_total",100,.05,.25)
+    #hist_total = rt.TH1F("datahist_total","datahist_total",100,.05,.25)
 
     name = "datahist_%i_%i_%i" % (grid_id, category.eta_b*100, category.eta_e*100)
     hist = rt.TH1F(name, name, 100, .05, .25)
@@ -273,9 +284,9 @@ def build_workspace_hist(tree, cut, grid_id, category):
     cut_string = generate_tree_cut(cut, category)
 
     tree.Draw("STr2_mPi0_rec>>%s" % name, cut_string)
-    tree.Draw("STr2_mPi0_rec>>datahist_total")
+    #tree.Draw("STr2_mPi0_rec>>datahist_total")
 
-    print "TOTAL HIST", hist_total.Integral()
+    #print "TOTAL HIST", hist_total.Integral()
     print "SELECTED HIST", hist.Integral()
     
     #build the workspace
@@ -295,7 +306,7 @@ def build_workspace_hist(tree, cut, grid_id, category):
     ntotal = 0
 
     #calculate the efficiency
-    eff = float(hist.GetEntries())/ float(hist_total.GetEntries())
+    eff = float(hist.GetEntries()) #/ float(hist_total.GetEntries())
 
     return (workspace, hist, eff)
 
