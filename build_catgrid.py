@@ -79,7 +79,8 @@ class analysis:
                 if fit_result == None: continue
                 
                 #write the canvas for tehc category
-                fit_result.canvas.Write(name_canvas)
+                if options.GRID_LIST != "no_list":
+                    fit_result.canvas.Write(name_canvas)
                 fit_result.result.Write(name_fit_res)
                 
     #store all the hard work in a histogram
@@ -112,7 +113,7 @@ class analysis:
     def build_sob_vs_s(self, outfile):
 
         
-        gROOT.ProcessLine("struct MyStruct{ Float_t s; Float_t b; Float_t sob; Int_t cat; Int_t gid;};")
+        gROOT.ProcessLine("struct MyStruct{ Float_t ns; Float_t nb; Float_t sob; Int_t cat; Int_t gid;};")
 
         s = rt.MyStruct()
 
@@ -120,17 +121,14 @@ class analysis:
 
         tree = rt.TTree("sob_tree", "sob info")
 
-        tree.Branch("ns",AddressOf(s, "s"), "ns/F")
-        tree.Branch("nb",AddressOf(s, "b"), "nb/F")
+        tree.Branch("ns",AddressOf(s, "ns"), "ns/F")
+        tree.Branch("nb",AddressOf(s, "nb"), "nb/F")
         tree.Branch("sob",AddressOf(s, "sob"), "sob/F")
         tree.Branch("gid",AddressOf(s, "gid"), "gid/I")
         tree.Branch("cat",AddressOf(s, "cat"), "cat/I")
 
-        hist_list = []
-
         n_cats = len(self.categories)
         for cc in range(n_cats):
-            hist_cc  = rt.TH2D("category_sob_vs_s_%i" % cc, "2d hist of grid performance", 1000, 0, 15000, 100, 0, 2.5)
                               
             for point in self.grid_points:
                 id = point.grid_id
@@ -205,7 +203,7 @@ class grid_point:
 
             print "\n-- Fitting Grid Point %i Category: (%f, %f) --\n" % (self.grid_id, cat.eta_b, cat.eta_e)
             
-            result = fit_dataset(rdata, self.grid_id, eff, 0, cat, self.tuple)
+            result = fit_result(*fit_dataset(rdata, self.grid_id, eff, 0, cat, self.tuple))
 
             cat.fit_result = result
                         
@@ -497,9 +495,8 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 
     big_text.DrawLatex(xmin + .7, ymin-1.5*ypass, type_line)
 
-    fit_res = fit_result(result, canvas, n_s_sob, n_b_sob, s_over_b, chi2, error_e, mean_val, sigma_val, mu_over_err, eff)
- 
-    return fit_res
+
+    return (result, canvas, n_s_sob, n_b_sob, s_over_b, chi2, error_e, mean_val, sigma_val, mu_over_err, eff) 
 
 
 #################
