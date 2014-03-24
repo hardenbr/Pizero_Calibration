@@ -31,12 +31,14 @@ def parse_array(vector,npizero):
 
     return temp
 
-def parse_idx(eta_b,eta_e, eta_val):
+def parse_idx(eta_b,eta_e, eta_val, m_val):
+    
     good_idx = []
 
     for ii in range(len(eta_val)):
-        if abs(eta_val[ii]) > eta_b and abs(eta_val[ii]) < eta_e:
-            good_idx.append(ii)
+        if abs(eta_val[ii]) > eta_b and abs(eta_val[ii]) < eta_e: #eta for the cateogry
+            if m_val[ii] > .05 and m_val[ii] < .25: #we don't fit outside this region
+                good_idx.append(ii)
 
     return good_idx
             
@@ -132,7 +134,7 @@ while iev < tree.GetEntries():
     arrays = [is_eb,iso,ncri1, ncri2, mpiz, ptg1, ptg2, eta, ptpi0, drg1g2, ese1_1, ese2_1, ese1_2, ese2_2, s4s9_1, s4s9_2]
 
     #parse the indices of pizeros with eta in the correct regions
-    idx = parse_idx(options.ETA_BEGIN, options.ETA_END, eta)
+    idx = parse_idx(options.ETA_BEGIN, options.ETA_END, eta, mpiz)
 
     #keep only the elements passing eta cuts
     for ii in range(len(arrays)): arrays[ii] = parse_elem(idx, arrays[ii])
