@@ -203,7 +203,7 @@ class grid_point:
 
             print "\n-- Fitting Grid Point %i Category: (%f, %f) --\n" % (self.grid_id, cat.eta_b, cat.eta_e)
             
-            result = fit_result(*fit_dataset(rdata, self.grid_id, eff, 0, cat, self.tuple))
+            result = fit_result(*fit_dataset(rdata, self.grid_id, eff, 1, cat, self.tuple))
 
             cat.fit_result = result
                         
@@ -314,8 +314,8 @@ def build_grid():
     ncri2 = range(0, 4)
 
     #pizero scan range
-    pi_cluster_pt = np.linspace(.4, 1, 3)
-    pi_pizero_pt = np.linspace(1.2, 2.4, 3)
+    pi_cluster_pt = np.linspace(.4, 1, 6)
+    pi_pizero_pt = np.linspace(1.2, 2.4, 5)
     pi_s4s9 = np.linspace(.7, .9, 3)
     pi_iso = np.linspace(.1, .3, 3)
     
@@ -331,7 +331,7 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 
     x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .05, .25,"GeV")
     mean  = rt.RooRealVar("m","#pi^{0} peak position", .13, .10, .135,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .01, .0085, .028,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .01, .0085, .025,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     #define the frame for x
@@ -356,7 +356,7 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
     #add the signal and the background in a model
     tot = rdata.Integral()#GetEntries()
     window = rdata.Integral(rdata.FindBin(.09),rdata.FindBin(.15))
-    print "%i TOTAL IN WINDOW: %f" % (il1,window)
+    #    print "%i TOTAL IN WINDOW: %f" % (il1,window)
 
     n_sig = rt.RooRealVar("nsig","#pi^{0} yield", tot*.1,tot*.05, tot*.25)
     n_bkg = rt.RooRealVar("nbkg","background yield",tot*.7, tot*.5, tot*.95)
@@ -399,8 +399,8 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
     #put the frame on a canvas
     can_name = None
 
-    if iSamp == 0: can_name = "grid_canvas%i_cat_%2.2f_%2.2f" % (il1, cat.eta_b, cat.eta_e)
-
+    can_name = "grid_canvas%i_cat_%2.2f_%2.2f" % (il1, cat.eta_b, cat.eta_e)
+    
     canvas = rt.TCanvas(can_name,can_name,1000,900)
     ####compute the interesting values
 
@@ -438,7 +438,7 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
     #low pad for drawing the fit
 
 
-    low_pad = rt.TPad("low_pad", "low_pad", 0, 0, 1, 0.8);
+    low_pad = rt.TPad("low_pad", "low_pad", 0, 0, 1, 0.7);
     low_pad.SetTopMargin(.05)
     low_pad.SetBottomMargin(.2)
     low_pad.Draw()
@@ -451,7 +451,7 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 
     canvas.cd()
     #write the latex onto the canvas
-    high_pad =  rt.TPad("top_pad","top_pad",0,0.8,1,1)
+    high_pad =  rt.TPad("top_pad","top_pad",0,0.7,1,1)
     high_pad.SetTopMargin(0)
     high_pad.SetBottomMargin(.4)
 
@@ -464,18 +464,17 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
     cut_line = "p_{t,#gamma} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i" % cut
     #    line4 = "Efficiency %.6f" % eff
 
-    l1_line = ""
-    if iSamp == 0:
-        l1_line = "Grid Point # %i  Category: %2.2f < |#eta| < %2.2f" % (il1, cat.eta_b, cat.eta_e)
+    l1_line = "Grid Point # %i  Category: %2.2f < |#eta| < %2.2f" % (il1, cat.eta_b, cat.eta_e)
 
     type_line = None
 
-    if iSamp == 0: type_line = "SEL"
+    if iSamp == 0: type_line = "EB"
+    if iSamp == 1: type_line = "EE"
 
     lat = rt.TLatex()
     lat.SetNDC()
     lat.SetTextFont(42)
-    lat.SetTextSize(.19)
+    lat.SetTextSize(.13)
     lat.SetTextColor(1)    
 
     ymin = .8
@@ -490,7 +489,7 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
     big_text = rt.TLatex()
     big_text.SetNDC()
     big_text.SetTextFont(42)
-    big_text.SetTextSize(.55)
+    big_text.SetTextSize(.50)
     big_text.SetTextColor(1)    
 
     big_text.DrawLatex(xmin + .7, ymin-1.5*ypass, type_line)
@@ -539,8 +538,14 @@ print "-- Analyzing # %i of total %i points -- " % (len(grid_list), ntot)
 analysis = analysis(grid, tree, grid_list)
 
 #define the categories
-analysis.add_category(0, 1)
-analysis.add_category(1, 1.4442)
+#BARREL
+#analysis.add_category(0, 1)
+#analysis.add_category(1, 1.4442)
+
+#ENDCAP
+analysis.add_category(1.566, 2.)
+analysis.add_category(2, 2.3)
+analysis.add_category(2.3, 2.5)
 
 #initialize the grid points
 analysis.initialize_grid()
