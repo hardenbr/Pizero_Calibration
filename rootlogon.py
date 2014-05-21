@@ -1,15 +1,16 @@
 import ROOT as rt
+import array
 
 def style():
   font = 42
   rt.gStyle.SetLegendFillColor(rt.kWhite)
-  rt.gStyle.SetOptTitle(0)
+
   rt.gStyle.SetTitleX(0.3)
   rt.gStyle.SetTitleW(0.4)
   rt.gStyle.SetCanvasBorderMode(0)
   rt.gStyle.SetCanvasColor(rt.kWhite)
   rt.gStyle.SetCanvasDefH(600)
-  rt.gStyle.SetCanvasDefW(900)
+  rt.gStyle.SetCanvasDefW(800)
   rt.gStyle.SetCanvasDefX(0)
   rt.gStyle.SetCanvasDefY(0)
   rt.gStyle.SetPadBorderMode(0)
@@ -48,3 +49,14 @@ def style():
   rt.gStyle.SetTitleW(0.4)
   rt.gStyle.SetPadTickX(1)
   rt.gStyle.SetPadTickY(1)
+
+
+  NRGBs = 5
+  NCont = 255
+  stops = array.array("d",[0.00, 0.34, 0.61, 0.84, 1.00 ])
+  red = array.array("d",[0.00, 0.00, 0.87, 1.00, 0.51 ])
+  green = array.array("d",[ 0.00, 0.81, 1.00, 0.20, 0.00 ])
+  blue = array.array("d",[ 0.51, 1.00, 0.12, 0.00, 0.00 ])
+
+  rt.TColor.CreateGradientColorTable(NRGBs, stops, red, green, blue, NCont)
+  rt.gStyle.SetNumberContours(NCont)
