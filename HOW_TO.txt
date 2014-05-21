@@ -1,0 +1,11 @@
+
+#run category optimization 
+python build_catgrid.py -f /afs/cern.ch/work/h/hardenbr/2014/PIZERO/TRIM_0p0_1p4442_withL1/res/HTL_Pi0_gridopt_90_92.root -o test.root -b 0 -e 2
+
+MAKE SURE TO SELECT THE CORRECT GRID INSIDE OF build_catgrid FOR THE CATEGORY YOU ARE SCANNING
+
+#run the categorizer from one grid point to the next
+python build_catgrid.py -f /afs/cern.ch/work/h/hardenbr/2014/PIZERO/TRIM_1p566_2p5_masstrim/res/HTL_FULL.root -o test_canvases.root -b 1 -e 2
+
+#to get the canvases it is necessary to input the pickled hists as well as the grid list of points youd like canvases build for
+python build_catgrid.py -f /afs/cern.ch/work/h/hardenbr/2014/PIZERO/TRIM_1p566_2p5_masstrim/res/HTL_FULL.root -o test_canvases.root -p test_list_pickle.txt -l grid_list.txt
