@@ -56,6 +56,7 @@ class analysis:
     def fit_grid_hists(self):
 
         for point in self.grid_points:
+            if point.grid_id not in self.grid_list: continue
             point.fit_category_data()
 
         print "-- Fitting Complete --"
@@ -64,7 +65,9 @@ class analysis:
         outfile.cd()
 
         for point in self.grid_points:
+            if point.grid_id not in self.grid_list: continue            
             for cat in point.cat_data:
+
 
                 name_fit_res = "fit_result_%i_%i_%i" % (point.grid_id, cat.eta_b*100, cat.eta_e*100)
                 name_hist = "hist_%i_%i_%i" % (point.grid_id, cat.eta_b*100, cat.eta_e*100)
@@ -131,6 +134,8 @@ class analysis:
         for cc in range(n_cats):
                               
             for point in self.grid_points:
+                if point.grid_id not in self.grid_list: continue
+                
                 id = point.grid_id
                 cat = point.cat_data[cc]
 
@@ -308,16 +313,30 @@ def build_workspace_hist(tree, cut, grid_id, category):
 
     return (workspace, hist, eff)
 
-def build_grid():
+def build_grid(is_EB):
+
     #cystals scan range
     ncri1 = range(0, 4)
     ncri2 = range(0, 4)
 
     #pizero scan range
-    pi_cluster_pt = np.linspace(.4, 1, 6)
-    pi_pizero_pt = np.linspace(1.2, 2.4, 5)
-    pi_s4s9 = np.linspace(.7, .9, 3)
+
+    pi_cluster_pt = np.linspace(.4, 1, 3)
+    pi_pizero_pt = np.linspace(1.2, 2.4, 3)
+    pi_s4s9 = np.linspace(.7, 1, 4)
     pi_iso = np.linspace(.1, .3, 3)
+
+    #use a different grid for the endcap
+    if not is_EB:
+        #cystals scan range
+        ncri1 = range(5, 9)
+        ncri2 = range(5, 9)
+
+        #pizero scan range
+        pi_cluster_pt = np.linspace(.4, 1, 3)
+        pi_pizero_pt = np.linspace(1.2, 2.4, 3)
+        pi_s4s9 = np.linspace(.7, 1, 3)
+        pi_iso = np.linspace(.2, .5, 3)
     
     #list the cuts together
     pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2)
@@ -508,7 +527,7 @@ tree = file.Get("Tree_HLT")
 
 outfile = rt.TFile(options.outfilename, "RECREATE")
 
-grid = build_grid()
+grid = build_grid(is_EB=False)
 ntot = len(grid)
 
 #trim the grid down if necessary
@@ -546,6 +565,7 @@ analysis = analysis(grid, tree, grid_list)
 analysis.add_category(1.566, 2.)
 analysis.add_category(2, 2.3)
 analysis.add_category(2.3, 2.5)
+
 
 #initialize the grid points
 analysis.initialize_grid()
