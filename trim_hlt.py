@@ -8,6 +8,10 @@ parser.add_option("-f", "--file", dest="filename",
                   help="hlt.root file name to analyze FILE",
                   action="store",type="string")
 
+parser.add_option("-m", "--mc", dest="is_mc",
+		                    help="running on MC",
+		                    action="store_true")
+
 parser.add_option("-o", "--outfile", dest="outfilename",
                   help="tree.root file name to output",default="datatree.root",
                   action="store",type="string")
@@ -93,7 +97,8 @@ out_tree.Branch("STr2_Es_e2_1",pizeros.STr2_Es_e2_1,"STr2_Es_e2_1[STr2_NPi0_rec]
 out_tree.Branch("STr2_Es_e2_2",pizeros.STr2_Es_e2_2,"STr2_Es_e2_2[STr2_NPi0_rec]/F")
 out_tree.Branch("STr2_S4S9_1",pizeros.STr2_S4S9_1,"STr2_S4S9_1[STr2_NPi0_rec]/F")
 out_tree.Branch("STr2_S4S9_2",pizeros.STr2_S4S9_2,"STr2_S4S9_2[STr2_NPi0_rec]/F")
-out_tree.Branch("L1bits",pizeros.L1bits,"L1bits[128]/I")
+if not options.is_mc:
+    out_tree.Branch("L1bits",pizeros.L1bits,"L1bits[128]/I")
 
 nevents = tree.Draw(">>iterlist" , "", "entrylist")
 
@@ -128,7 +133,8 @@ while iev < tree.GetEntries():
     ese2_2 = parse_array( tree.STr2_Es_e2_2, npiz)
     s4s9_1 = parse_array(tree.STr2_S4S9_1, npiz)
     s4s9_2 = parse_array(tree.STr2_S4S9_2, npiz)
-    l1bits = parse_array(tree.L1bits,128) 
+    if not options.is_mc:
+        l1bits = parse_array(tree.L1bits,128) 
     
     #make alist of the arrays to iterate over
     arrays = [is_eb,iso,ncri1, ncri2, mpiz, ptg1, ptg2, eta, ptpi0, drg1g2, ese1_1, ese2_1, ese1_2, ese2_2, s4s9_1, s4s9_2]
@@ -158,7 +164,8 @@ while iev < tree.GetEntries():
         pizeros.STr2_Es_e2_2 = array.array("f",arrays[13])
         pizeros.STr2_S4S9_1 = array.array("f",arrays[14])
         pizeros.STr2_S4S9_2 = array.array("f",arrays[15])
-        pizeros.L1bits = array.array("i",l1bits) #fill all of the l1 bits every time
+        if not options.is_mc:
+            pizeros.L1bits = array.array("i",l1bits) #fill all of the l1 bits every time
         out_tree.Fill()
  
 out_tree.Write()

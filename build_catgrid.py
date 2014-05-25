@@ -1,3 +1,4 @@
+
 from ROOT import gSystem, RooArgSet, RooFit, AddressOf, gROOT
 gSystem.Load('libRooFit')
 from  optparse  import OptionParser
@@ -14,16 +15,34 @@ RooFit.PrintLevel(-1)
 RooFit.Verbose(False)
 rt.RooMsgService.instance().setGlobalKillBelow(RooFit.WARNING)
 
+MIN_EVENTS = 10000
+
 class analysis:
-    def __init__(self, grid, tree, grid_list):
+    def __init__(self, grid, tree, grid_list, is_eb):
         self.grid = grid
 
         self.grid_points = []  
         self.categories = []
         self.tree = tree
         self.grid_list = grid_list
+        self.is_eb = is_eb
+
+        if is_eb:
+            print "---- Building Barrel Analysis ----"
+        else:
+            print "---- Building Endcap Analysis ----"
+        
         
     def add_category(self, eta_begin, eta_end):
+        if self.is_eb:
+            if eta_begin > 1.5 or eta_end > 1.5:
+                print "ERROR: CATEGORY NOT IN BARREL"
+                exit(1)
+        else:
+            if eta_begin < 1.5 or eta_end < 1.5:
+                print "ERROR: CATEGORY NOT IN ENDCAP"
+                exit(1)
+
         cat = category_def(eta_begin, eta_end)
         self.categories.append(cat)
         
@@ -33,16 +52,23 @@ class analysis:
             exit(1)
 
         print "-- Initializing Grid --"
-        for ii in self.grid:                        
-            idx =  grid.index(ii)
-
-            #only analyize grid points in the grid list
-            if idx not in self.grid_list: continue
-            
+        for ii in self.grid_list:
+            print ii
             #build the grid point
-            point = grid_point(ii, idx, self.categories)
+            point = grid_point(self.grid[ii], ii, self.categories)
 
             self.grid_points.append(point)
+
+        #for ii in self.grid:                        
+        #    idx =  grid.index(ii)#
+
+            #only analyize grid points in the grid list
+            #if idx not in self.grid_list: continue 
+            
+            #build the grid point
+            #point = grid_point(ii, idx, self.categories)
+
+            #self.grid_points.append(point)
 
     def build_grid_hists(self):
 
@@ -50,7 +76,7 @@ class analysis:
 
         for point in self.grid_points:
 
-            if point.grid_id % 100 == 0: print "-- Scanning Grid Point %i --" % point.grid_id
+            print "\n-- Scanning Grid Point %i --" % point.grid_id
             point.get_category_hists(self.tree)
 
     def fit_grid_hists(self):
@@ -68,6 +94,7 @@ class analysis:
             if point.grid_id not in self.grid_list: continue            
             for cat in point.cat_data:
 
+                if cat == None: continue 
 
                 name_fit_res = "fit_result_%i_%i_%i" % (point.grid_id, cat.eta_b*100, cat.eta_e*100)
                 name_hist = "hist_%i_%i_%i" % (point.grid_id, cat.eta_b*100, cat.eta_e*100)
@@ -82,7 +109,7 @@ class analysis:
                 if fit_result == None: continue
                 
                 #write the canvas for tehc category
-                if options.GRID_LIST != "no_list":
+                if options.GRID_LIST != "no_list" or options.do_write:
                     fit_result.canvas.Write(name_canvas)
                 fit_result.result.Write(name_fit_res)
                 
@@ -104,6 +131,7 @@ class analysis:
         #merge all the points into a single list
         for ll in lines:
             pickled_points = pickle.load(open(ll,"rb"))
+
             for point in pickled_points:
                 print "grid id:", point.grid_id
             
@@ -131,13 +159,15 @@ class analysis:
         tree.Branch("cat",AddressOf(s, "cat"), "cat/I")
 
         n_cats = len(self.categories)
-        for cc in range(n_cats):
+        for cc in xrange(n_cats):
                               
             for point in self.grid_points:
                 if point.grid_id not in self.grid_list: continue
                 
                 id = point.grid_id
                 cat = point.cat_data[cc]
+
+                if cat == None: continue #if None, this was skipped due to lack of statistics
 
                 fit_res = cat.fit_result
 
@@ -166,7 +196,6 @@ class category_data:
         self.eta_b = category_def.eta_b
         self.eta_e = category_def.eta_e
         self.cat = category_def
-
         self.workspace = workspace
         self.rdata = rdata
         self.eff = eff
@@ -197,18 +226,24 @@ class grid_point:
 
             cat_result = category_data(cat, workspace, rdata, eff)
 
-            self.cat_data.append(cat_result)
+            integral = rdata.Integral()
+
+            #only worry about cut points with enough events to fit
+            if integral < MIN_EVENTS:
+                self.cat_data.append(None)
+            else:
+                self.cat_data.append(cat_result)
 
     #fit each category for this grid point using the histogram stored previously
     def fit_category_data(self):
         for cat in self.cat_data:
-
+            if cat == None: continue
             rdata = cat.rdata
             eff = cat.eff
 
-            print "\n-- Fitting Grid Point %i Category: (%f, %f) --\n" % (self.grid_id, cat.eta_b, cat.eta_e)
-            
-            result = fit_result(*fit_dataset(rdata, self.grid_id, eff, 1, cat, self.tuple))
+            print "\n-- Fitting Grid Point %i Category: (%f, %f) --\n" % (self.grid_id, cat.eta_b, cat.eta_e)            
+
+            result = fit_result(*fit_dataset(rdata, self.grid_id, eff, 0, cat, self.tuple))
 
             cat.fit_result = result
                         
@@ -254,6 +289,14 @@ parser.add_option("-p", "--pickle", dest="pickle",
                   help="name of .txt file listing pickled histogram data. If not specified, the histograms will be pickled and outputted",
                   action="store",type="string",default="no_file")
 
+parser.add_option( "--eb", dest="is_eb",
+                  help="flag for different grid optimization",
+                  action="store_true")
+
+parser.add_option( "--sample", dest="sample_name",
+                  help="name of the sample", default="13 TeV MC",
+                  action="store", type="string")
+
 parser.add_option("-w","--write", dest="do_write", help="write the fits and canvases",
                                    action="store_true", default=False)
 
@@ -261,13 +304,16 @@ parser.add_option("-w","--write", dest="do_write", help="write the fits and canv
 
 def generate_tree_cut(cut, category):
 
+
     eta_cut = "(STr2_etaPi0_rec*STr2_etaPi0_rec) > %f && (STr2_etaPi0_rec*STr2_etaPi0_rec) < %f" % (category.eta_b*category.eta_b, category.eta_e * category.eta_e)
-
     id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
-
-    #    es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])    
-
     total_cut = "(" + id_cut + ") && (" + eta_cut + ")"
+
+    if not options.is_eb:
+        eta_cut = "(STr2_etaPi0_rec*STr2_etaPi0_rec) > %f && (STr2_etaPi0_rec*STr2_etaPi0_rec) < %f" % (category.eta_b*category.eta_b, category.eta_e * category.eta_e)
+        id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
+        es_cut = "((STr2_Es_e1_1 + STr2_Es_e2_1) > %f  && (STr2_Es_e1_2 + STr2_Es_e2_2) > %f)" % (cut[6], cut[6])    
+        total_cut = "(" + id_cut + ") && (" + eta_cut + ") && (" + es_cut + ")"
 
     print total_cut
 
@@ -285,6 +331,12 @@ def build_workspace_hist(tree, cut, grid_id, category):
     hist = rt.TH1F(name, name, 100, .05, .25)
 
     cut_string = generate_tree_cut(cut, category)
+
+    n_events_cut = tree.GetEntries(cut_string)
+    if n_events_cut < MIN_EVENTS:        
+        print "\t SKIPPING FIT....NOT ENOUGH EVENTS: %i" % n_events_cut
+        return (None, hist, -1) #Return garbage if we dont care 
+
 
     tree.Draw("STr2_mPi0_rec>>%s" % name, cut_string)
     #tree.Draw("STr2_mPi0_rec>>datahist_total")
@@ -320,26 +372,29 @@ def build_grid(is_EB):
     ncri2 = range(0, 4)
 
     #pizero scan range
-
     pi_cluster_pt = np.linspace(.4, 1, 3)
     pi_pizero_pt = np.linspace(1.2, 2.4, 3)
-    pi_s4s9 = np.linspace(.7, 1, 4)
+    pi_s4s9 = np.linspace(.8, 1, 4)
     pi_iso = np.linspace(.1, .3, 3)
 
+    #list the cuts together
+    pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2)
+
     #use a different grid for the endcap
-    if not is_EB:
+    if not options.is_eb:
         #cystals scan range
-        ncri1 = range(5, 9)
+        ncri1 = range(6, 10)
         ncri2 = range(5, 9)
 
         #pizero scan range
-        pi_cluster_pt = np.linspace(.4, 1, 3)
-        pi_pizero_pt = np.linspace(1.2, 2.4, 3)
-        pi_s4s9 = np.linspace(.7, 1, 3)
+        pi_cluster_pt = np.linspace(.4, 1.2, 4)
+        pi_pizero_pt = np.linspace(1.2, 2.4, 4)
+        pi_s4s9 = np.linspace(.7, .9, 3)
         pi_iso = np.linspace(.2, .5, 3)
-    
-    #list the cuts together
-    pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2)
+        es = np.linspace(0, 1, 3)
+
+        #list the cuts together
+        pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2, es)
 
     #take all possible combinations
     pi_grid = list(itertools.product(*pizero_cuts))
@@ -479,31 +534,40 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 
     sob_line = "S/B: %.3f #pm %.3f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
     chi_sq_line = "reduced #chi^{2}: %.2f," % chi2
-    gaus_line = "#mu: %.3f, #sigma: %.3f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
-    cut_line = "p_{t,#gamma} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i" % cut
+    gaus_line = "#mu: %.4f, #sigma: %.4f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
+
+    if options.is_eb:
+        cut_line = "p_{t,#gamma} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i" % cut
+    else:
+        cut_line = "p_{t,#gamma} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i, ES_{1+2} > %2.2f" % cut
     #    line4 = "Efficiency %.6f" % eff
 
     l1_line = "Grid Point # %i  Category: %2.2f < |#eta| < %2.2f" % (il1, cat.eta_b, cat.eta_e)
 
+    sample_line = "Sample: %s" % options.sample_name
+
     type_line = None
 
-    if iSamp == 0: type_line = "EB"
-    if iSamp == 1: type_line = "EE"
+    if options.is_eb:
+        type_line = "EB"
+    else:
+        type_line = "EE"
 
     lat = rt.TLatex()
     lat.SetNDC()
     lat.SetTextFont(42)
-    lat.SetTextSize(.13)
+    lat.SetTextSize(.11)
     lat.SetTextColor(1)    
 
     ymin = .8
     xmin = .025
-    ypass = .23
+    ypass = .19
     
     lat.DrawLatex(xmin,ymin, l1_line)
     lat.DrawLatex(xmin,ymin-ypass, sob_line)
     lat.DrawLatex(xmin,ymin-2*ypass, chi_sq_line + " " + gaus_line)
     lat.DrawLatex(xmin,ymin-3*ypass, cut_line)
+    lat.DrawLatex(xmin,ymin-4*ypass, sample_line)
 
     big_text = rt.TLatex()
     big_text.SetNDC()
@@ -527,7 +591,7 @@ tree = file.Get("Tree_HLT")
 
 outfile = rt.TFile(options.outfilename, "RECREATE")
 
-grid = build_grid(is_EB=False)
+grid = build_grid(options.is_eb)
 ntot = len(grid)
 
 #trim the grid down if necessary
@@ -551,20 +615,24 @@ else:
     grid_list = range(0,ntot)
     print "-- Warning! Scanning Full Grid --"                                    
 
-print "-- Analyzing # %i of total %i points -- " % (len(grid_list), ntot)
+print "-- Analyzing %i of %i points possible -- " % (len(grid_list), ntot)
 
 #build the analysis from the grid and tree data
-analysis = analysis(grid, tree, grid_list)
+analysis = analysis(grid, tree, grid_list, options.is_eb)
 
 #define the categories
-#BARREL
-#analysis.add_category(0, 1)
-#analysis.add_category(1, 1.4442)
-
-#ENDCAP
-analysis.add_category(1.566, 2.)
-analysis.add_category(2, 2.3)
-analysis.add_category(2.3, 2.5)
+if options.is_eb:
+    #BARREL
+    analysis.add_category(0, 1)
+    analysis.add_category(1, 1.4442)
+else:
+   #ENDCAP
+   analysis.add_category(1.5, 1.8)
+   analysis.add_category(1.8, 2.0)
+   analysis.add_category(2.0, 2.2)
+   analysis.add_category(2.2, 2.3)
+   analysis.add_category(2.3, 2.4)
+   analysis.add_category(2.4, 2.5)
 
 
 #initialize the grid points

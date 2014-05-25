@@ -16,6 +16,11 @@ parser.add_option("-j", "--jobs", dest="jobs",
 		                    help="number of jobs to run at once",
 		                    action="store",type="string")
 
+
+parser.add_option("-m", "--mc", dest="is_mc",
+		                    help="running on MC",
+		                    action="store_true")
+
 parser.add_option("--eta_b", dest="ETA_BEGIN",
                   help="minimum of eta range",
                   action="store",type="float",default=0)
@@ -74,8 +79,15 @@ for ii in range(n_file):
 
 	#if the eta range is specified pass this to buildgrid and change the output name of the file
 	if eta_b != 0 or eta_e < 10:
+		file_name = files[ii].split("/")[-1]
+		
 		output_name = output_name[:-5]+ "_%i_%i.root" % (eta_b*100,eta_e*100)
-		cmd = "python %s/trim_hlt.py -f %s -o %s --eta_b %f --eta_e %f \n" % (output_dir, files[ii], output_name, eta_b, eta_e)
+		cmd = "xrdcp %s . \n" % files[ii] 
+		if not options.is_mc:
+			cmd += "python %s/trim_hlt.py -f %s -o %s --eta_b %f --eta_e %f \n" % (output_dir, file_name, output_name, eta_b, eta_e)
+		else:
+			cmd += "python %s/trim_hlt.py --mc -f %s -o %s --eta_b %f --eta_e %f \n" % (output_dir, file_name, output_name, eta_b, eta_e)
+		cmd += "rm %s\n" % file_name
 	else:
 		cmd = ""
 		print "WHY ARE YOU NOT TRIMMING IN ETA???"
@@ -100,7 +112,7 @@ for ii in range(len(commands)):
 		bsub_file.write("cd /afs/cern.ch/user/h/hardenbr/CMSSW_6_2_0/\n")
 		bsub_file.write("export SCRAM_ARCH=slc5_amd64_gcc462 \n")
 		bsub_file.write("eval `scramv1 ru -sh`\n")
-
+		bsub_file.write("cd %s\n" % output_dir)
 		cmd="bsub -q 1nd "
 		cmd+= "-o %s/logs/job_%i.log " % (output_dir ,job)
 		cmd+="source "+ bsub_file_name

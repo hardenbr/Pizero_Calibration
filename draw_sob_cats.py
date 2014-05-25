@@ -11,12 +11,12 @@ max_s_2 = 50
 nbin_s = 25
 
 min_sob = 0
-max_sob = .5
-max_sob_2 = .5
+max_sob = 2
+max_sob_2 = 2
 
 nbin_sob = 25
 
-scale_factor = 11. * 1368. / 1177435
+scale_factor = 11. * 1368. / 100000000
 
 file = rt.TFile(sys.argv[1])
 
@@ -53,6 +53,7 @@ for event in range(tree.GetEntries()):
     if content == 0 and tree.cat == 0:
         gid_used.append(tree.gid)
         hist.Fill(tree.ns * scale_factor ,tree.sob,tree.gid)
+        print tree.ns, tree.sob
 
 tree.Draw(">>iterlist2","","entrylist")
 itlist2 = rt.gDirectory.Get("iterlist2")
