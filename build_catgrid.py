@@ -15,7 +15,7 @@ RooFit.PrintLevel(-1)
 RooFit.Verbose(False)
 rt.RooMsgService.instance().setGlobalKillBelow(RooFit.WARNING)
 
-MIN_EVENTS = 10000
+MIN_EVENTS = 500
 
 class analysis:
     def __init__(self, grid, tree, grid_list, is_eb):
@@ -367,31 +367,61 @@ def build_workspace_hist(tree, cut, grid_id, category):
 
 def build_grid(is_EB):
 
-    #cystals scan range
-    ncri1 = range(0, 4)
-    ncri2 = range(0, 4)
 
-    #pizero scan range
-    pi_cluster_pt = np.linspace(.4, 1, 3)
-    pi_pizero_pt = np.linspace(1.2, 2.4, 3)
-    pi_s4s9 = np.linspace(.8, 1, 4)
-    pi_iso = np.linspace(.1, .3, 3)
+    #pizero scan range -- may 26 scan
+    #ncri1 = range(0, 1)
+    #ncri2 = range(0, 1)
+    #pi_cluster_pt = np.linspace(.4, 1.2, 5)
+    #pi_pizero_pt = np.linspace(1.2, 2.4, 5)
+    #pi_s4s9 = np.linspace(.7, .98, 5)
+    #pi_iso = np.linspace(.2, .5, 5)
+
+    #pizero scan range -- may 27 scan
+    #ncri1 = range(0, 1)
+    #ncri2 = range(0, 1)
+    #pi_cluster_pt = np.linspace(1, 2, 5)
+    #pi_pizero_pt = np.linspace(.5, 2, 5)
+    #pi_s4s9 = np.linspace(.85, .98, 5)
+    #pi_iso = np.linspace(.4, 1, 5)
+
+    #pizero scan range -- may 27 scan TWEAK
+    #ncri1 = range(0, 1)
+    #ncri2 = range(0, 1)
+    #pi_cluster_pt = np.linspace(2, 3, 5)
+    #pi_pizero_pt = np.linspace(.1, .5, 5)
+    #pi_s4s9 = np.linspace(.92, .92, 1)
+    #pi_iso = np.linspace(.85, 1, 1)
+
+    #pizero scan range -- jun 18
+    ncri1 = range(0, 1)
+    ncri2 = range(0, 1)
+    pi_cluster_pt_1 = np.linspace(1, 3, 10)
+    #pi_cluster_pt_2 = np.linspace(1, 3, 10)
+    pi_pizero_pt = np.linspace(.5, 1, 5)
+    pi_s4s9 = np.linspace(.92, .92, 1)
+    pi_iso = np.linspace(1, 1, 1)
 
     #list the cuts together
     pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2)
 
     #use a different grid for the endcap
     if not options.is_eb:
-        #cystals scan range
-        ncri1 = range(6, 10)
-        ncri2 = range(5, 9)
+        #cystals scan range -------- may 26 scan
+        #ncri1 = range(6, 10)
+        #ncri2 = range(5, 9)
+        #pi_cluster_pt = np.linspace(.4, 1.2, 4)
+        #pi_pizero_pt = np.linspace(1.2, 2.4, 4)
+        #pi_s4s9 = np.linspace(.7, .9, 3)
+        #pi_iso = np.linspace(.2, .5, 3)
+        #es = np.linspace(0, 1, 3)
 
-        #pizero scan range
-        pi_cluster_pt = np.linspace(.4, 1.2, 4)
-        pi_pizero_pt = np.linspace(1.2, 2.4, 4)
-        pi_s4s9 = np.linspace(.7, .9, 3)
-        pi_iso = np.linspace(.2, .5, 3)
-        es = np.linspace(0, 1, 3)
+        ncri1 = range(6, 9)
+        ncri2 = range(5, 8)
+        pi_cluster_pt = np.linspace(1, 2, 4)
+        pi_pizero_pt = np.linspace(.5, 2, 4)
+        pi_s4s9 = np.linspace(.8, .98, 3)
+        pi_iso = np.linspace(.4, 1, 3)
+        es = np.linspace(.1, 1.5, 5)
 
         #list the cuts together
         pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2, es)
@@ -404,8 +434,8 @@ def build_grid(is_EB):
 def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 
     x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .05, .25,"GeV")
-    mean  = rt.RooRealVar("m","#pi^{0} peak position", .13, .10, .135,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .01, .0085, .025,"GeV")
+    mean  = rt.RooRealVar("m","#pi^{0} peak position", .12, .11, .135,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .01, .0085, .019,"GeV")
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     #define the frame for x
@@ -424,15 +454,15 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
     c6 = rt.RooRealVar("c6","c6",.3,-1,1)
 
     #using a polynomial background
-    bkg_pars = rt.RooArgList(c0,c1,c2)
+    bkg_pars = rt.RooArgList(c0,c1,c2,c3)
     bkg = rt.RooChebychev("bkg","bkg", x, bkg_pars)
     
     #add the signal and the background in a model
     tot = rdata.Integral()#GetEntries()
-    window = rdata.Integral(rdata.FindBin(.09),rdata.FindBin(.15))
+    #window = rdata.Integral(rdata.FindBin(.09),rdata.FindBin(.15))
     #    print "%i TOTAL IN WINDOW: %f" % (il1,window)
 
-    n_sig = rt.RooRealVar("nsig","#pi^{0} yield", tot*.1,tot*.05, tot*.25)
+    n_sig = rt.RooRealVar("nsig","#pi^{0} yield", tot*.1,tot*.02, tot*.6)
     n_bkg = rt.RooRealVar("nbkg","background yield",tot*.7, tot*.5, tot*.95)
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
@@ -630,9 +660,10 @@ else:
    analysis.add_category(1.5, 1.8)
    analysis.add_category(1.8, 2.0)
    analysis.add_category(2.0, 2.2)
-   analysis.add_category(2.2, 2.3)
-   analysis.add_category(2.3, 2.4)
-   analysis.add_category(2.4, 2.5)
+   #analysis.add_category(2.2, 2.5)
+   #analysis.add_category(2.2, 2.3)
+   #analysis.add_category(2.3, 2.4)
+   #analysis.add_category(2.4, 2.5)
 
 
 #initialize the grid points

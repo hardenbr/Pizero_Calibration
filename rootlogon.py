@@ -52,7 +52,7 @@ def style():
 
 
   NRGBs = 5
-  NCont = 255
+  NCont = 100
   stops = array.array("d",[0.00, 0.34, 0.61, 0.84, 1.00 ])
   red = array.array("d",[0.00, 0.00, 0.87, 1.00, 0.51 ])
   green = array.array("d",[ 0.00, 0.81, 1.00, 0.20, 0.00 ])
