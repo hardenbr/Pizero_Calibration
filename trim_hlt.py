@@ -35,7 +35,7 @@ def parse_array(vector,npizero):
 
     return temp
 
-def parse_idx(eta_b,eta_e, eta_val, m_val):
+def parse_idx(eta_b, eta_e, eta_val, m_val):
     
     good_idx = []
 

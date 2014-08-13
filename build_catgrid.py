@@ -1,4 +1,3 @@
-
 from ROOT import gSystem, RooArgSet, RooFit, AddressOf, gROOT
 gSystem.Load('libRooFit')
 from  optparse  import OptionParser
@@ -293,6 +292,11 @@ parser.add_option( "--eb", dest="is_eb",
                   help="flag for different grid optimization",
                   action="store_true")
 
+parser.add_option( "--eta", dest="is_eta",
+                  help="optimization for the eta",
+                  action="store_true")
+
+
 parser.add_option( "--sample", dest="sample_name",
                   help="name of the sample", default="13 TeV MC",
                   action="store", type="string")
@@ -306,14 +310,20 @@ def generate_tree_cut(cut, category):
 
 
     eta_cut = "(STr2_etaPi0_rec*STr2_etaPi0_rec) > %f && (STr2_etaPi0_rec*STr2_etaPi0_rec) < %f" % (category.eta_b*category.eta_b, category.eta_e * category.eta_e)
-    id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
-    total_cut = "(" + id_cut + ") && (" + eta_cut + ")"
+    pt_cut = "(STr2_ptG1_rec > %f && STr2_ptG2_rec > %f) || (STr2_ptG1_rec > %f && STr2_ptG2_rec > %f)" % (cut[0], cut[6], cut[6], cut[0]) #check if either combination works...since we dont know which is the leading one
+    id_cut =  "STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
+
+    total_cut = "(" + id_cut + ") && (" + eta_cut + ")" + " && (" + pt_cut + ")"
 
     if not options.is_eb:
         eta_cut = "(STr2_etaPi0_rec*STr2_etaPi0_rec) > %f && (STr2_etaPi0_rec*STr2_etaPi0_rec) < %f" % (category.eta_b*category.eta_b, category.eta_e * category.eta_e)
-        id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
-        es_cut = "((STr2_Es_e1_1 + STr2_Es_e2_1) > %f  && (STr2_Es_e1_2 + STr2_Es_e2_2) > %f)" % (cut[6], cut[6])    
-        total_cut = "(" + id_cut + ") && (" + eta_cut + ") && (" + es_cut + ")"
+
+        id_cut =  "STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
+        
+        es_cut = "((STr2_Es_e1_1 + STr2_Es_e1_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[6], cut[6])
+        pt_cut = "(STr2_ptG1_rec > %f && STr2_ptG2_rec > %f)" % (cut[0], cut[0])
+        #pt_cut = "(STr2_ptG1_rec > %f && STr2_ptG2_rec > %f) || (STr2_ptG1_rec > %f && STr2_ptG2_rec > %f)" % (cut[0], cut[0])
+        total_cut = "(" + id_cut + ") && (" + eta_cut + ") && (" + es_cut + ") && (" + pt_cut + ")"
 
     print total_cut
 
@@ -328,7 +338,9 @@ def build_workspace_hist(tree, cut, grid_id, category):
     #hist_total = rt.TH1F("datahist_total","datahist_total",100,.05,.25)
 
     name = "datahist_%i_%i_%i" % (grid_id, category.eta_b*100, category.eta_e*100)
-    hist = rt.TH1F(name, name, 100, .05, .25)
+    hist = rt.TH1F(name, name, 100, .05, .20)
+    if options.is_eta:
+        hist = rt.TH1F(name, name, 100, .25, .8)
 
     cut_string = generate_tree_cut(cut, category)
 
@@ -336,7 +348,11 @@ def build_workspace_hist(tree, cut, grid_id, category):
     if n_events_cut < MIN_EVENTS:        
         print "\t SKIPPING FIT....NOT ENOUGH EVENTS: %i" % n_events_cut
         return (None, hist, -1) #Return garbage if we dont care 
-
+    
+    if options.is_eb:
+        if cut[0] < cut[6]:
+            print "\t GRID REDUNDANCY SKIPPING FIT.... pt1 < pt2: %f < %f" % (cut[0], cut[6]) 
+            return (None, hist, -1)
 
     tree.Draw("STr2_mPi0_rec>>%s" % name, cut_string)
     #tree.Draw("STr2_mPi0_rec>>datahist_total")
@@ -347,7 +363,7 @@ def build_workspace_hist(tree, cut, grid_id, category):
     #build the workspace
     workspace = rt.RooWorkspace("workspace")
 
-    variables = ["mpizero[.1., .05., .25]"]
+    variables = ["mpizero[.1., .05., .20]"]
 
     #factory all the variables
     for v in variables: workspace.factory(v)    
@@ -392,17 +408,27 @@ def build_grid(is_EB):
     #pi_s4s9 = np.linspace(.92, .92, 1)
     #pi_iso = np.linspace(.85, 1, 1)
 
-    #pizero scan range -- jun 18
-    ncri1 = range(0, 1)
-    ncri2 = range(0, 1)
-    pi_cluster_pt_1 = np.linspace(1, 3, 10)
-    #pi_cluster_pt_2 = np.linspace(1, 3, 10)
-    pi_pizero_pt = np.linspace(.5, 1, 5)
+    #pizero barrel scan range -- jun 18, 2014
+    ncri1 = range(6, 9)
+    ncri2 = range(6, 8)
+    pi_cluster_pt_1 = np.linspace(1.5, 3, 6)
+    pi_cluster_pt_2 = np.linspace(1.5, 3, 6)
+    pi_pizero_pt = np.linspace(.5, 1.5, 6)
     pi_s4s9 = np.linspace(.92, .92, 1)
     pi_iso = np.linspace(1, 1, 1)
 
+    #eta barrel scan range -- august 13, 2014
+    if options.is_eta:
+        ncri1 = range(5, 8)
+        ncri2 = range(5, 7)
+        pi_cluster_pt_1 = np.linspace(1, 2.5, 6)
+        pi_cluster_pt_2 = np.linspace(1, 2.5, 6)
+        pi_pizero_pt = np.linspace(1.5, 4, 6)
+        pi_s4s9 = np.linspace(.92, .92, 1)
+        pi_iso = np.linspace(1, 1, 1)
+
     #list the cuts together
-    pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2)
+    pizero_cuts = (pi_cluster_pt_1, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2, pi_cluster_pt_2)
 
     #use a different grid for the endcap
     if not options.is_eb:
@@ -416,12 +442,12 @@ def build_grid(is_EB):
         #es = np.linspace(0, 1, 3)
 
         ncri1 = range(6, 9)
-        ncri2 = range(5, 8)
-        pi_cluster_pt = np.linspace(1, 2, 4)
-        pi_pizero_pt = np.linspace(.5, 2, 4)
-        pi_s4s9 = np.linspace(.8, .98, 3)
-        pi_iso = np.linspace(.4, 1, 3)
-        es = np.linspace(.1, 1.5, 5)
+        ncri2 = range(2, 7)
+        pi_cluster_pt = np.linspace(.5, 1.5, 5)
+        pi_pizero_pt = np.linspace(1.5, 3, 5)
+        pi_s4s9 = np.linspace(.92, .92, 1)
+        pi_iso = np.linspace(1, 1, 1)
+        es = np.linspace(0, .8, 5)
 
         #list the cuts together
         pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2, es)
@@ -433,9 +459,17 @@ def build_grid(is_EB):
 
 def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 
-    x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .05, .25,"GeV")
+    #set the ranges based on the particle
+    x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .05, .20,"GeV")
     mean  = rt.RooRealVar("m","#pi^{0} peak position", .12, .11, .135,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .01, .0085, .019,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .011, .010, .0140,"GeV")
+
+    if options.is_eta:
+        x  = rt.RooRealVar("mpizero","#eta invariant mass", .25, .80,"GeV")
+        mean  = rt.RooRealVar("m","#eta peak position", .525, .45, .58,"GeV")
+        sigma  = rt.RooRealVar("sigma","#eta core #sigma", .5, .35, .6,"GeV")
+
+    #build the signal model for the pizero or eta
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
 
     #define the frame for x
@@ -464,9 +498,16 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 
     n_sig = rt.RooRealVar("nsig","#pi^{0} yield", tot*.1,tot*.02, tot*.6)
     n_bkg = rt.RooRealVar("nbkg","background yield",tot*.7, tot*.5, tot*.95)
+
+    #changing the normalization is not necessary yet
+    #if options.is_eta:
+    #    n_sig = rt.RooRealVar("nsig","#eta yield", tot*.1,tot*.02, tot*.6)
+    #    n_bkg = rt.RooRealVar("nbkg","background yield",tot*.7, tot*.5, tot*.95)
+
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
-    
+
+
     #    t1.Print()
     nll = rt.RooNLLVar("nll","log likelihood var", model, t1, True)
     m = rt.RooMinuit(nll)    
@@ -480,7 +521,10 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
     
     #declare the signal over background range
     x.setRange("sobRange",mean.getVal()-2.*sigma.getVal(), mean.getVal()+2.*sigma.getVal())
-    x.setRange("FULL",.05,.25)
+    x.setRange("FULL",.05,.20)
+    if options.is_eta:
+        x.setRange("FULL", .25, .8)
+
 
     #calculate integrals
     integralBkg_sob = bkg.createIntegral(rt.RooArgSet(x),RooFit.NormSet(rt.RooArgSet(x)),RooFit.Range("sobRange"))
@@ -566,11 +610,15 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
     chi_sq_line = "reduced #chi^{2}: %.2f," % chi2
     gaus_line = "#mu: %.4f, #sigma: %.4f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
 
+    # determin the line of text displaying the cuts applied
     if options.is_eb:
-        cut_line = "p_{t,#gamma} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i" % cut
+        cut_line = "p_{t,#gamma1} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i, p_{t,#gamma2} > %2.2f" % cut
+        if options.is_eta:
+            cut_line = "p_{t,#gamma1} > %2.2f, p_{t,#eta} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i, p_{t,#gamma2} > %2.2f" % cut
     else:
         cut_line = "p_{t,#gamma} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i, ES_{1+2} > %2.2f" % cut
-    #    line4 = "Efficiency %.6f" % eff
+        if options.is_eta:
+            cut_line = "p_{t,#gamma} > %2.2f, p_{t,#eta} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i, ES_{1+2} > %2.2f" % cut
 
     l1_line = "Grid Point # %i  Category: %2.2f < |#eta| < %2.2f" % (il1, cat.eta_b, cat.eta_e)
 
@@ -660,6 +708,7 @@ else:
    analysis.add_category(1.5, 1.8)
    analysis.add_category(1.8, 2.0)
    analysis.add_category(2.0, 2.2)
+   #analysis.add_category(2.2, 2.5)
    #analysis.add_category(2.2, 2.5)
    #analysis.add_category(2.2, 2.3)
    #analysis.add_category(2.3, 2.4)

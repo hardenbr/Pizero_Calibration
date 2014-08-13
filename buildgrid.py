@@ -91,7 +91,7 @@ def cut_veto_lines(file):
 
 #DEPRECATED
 def generate_tree_cut(cut):
-    id_cut = "STr2_ptG1_rec > %f && STr2_ptG2_rec > %f && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[0], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])        
+    id_cut = "((STr2_ptG1_rec > %f && STr2_ptG2_rec > %f) || (STr2_ptG2_rec > %f && STr2_ptG1_rec > %f )) && STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[0], cut[7], cut[0], cut[7], cut[1], cut[3], cut[3], cut[4], cut[5], cut[6])        
 
     es_cut = "STr2_Pi0recIsEB || ((STr2_Es_e1_1 + STr2_Es_e2_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[2],cut[2])    
 
