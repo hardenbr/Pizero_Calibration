@@ -5,6 +5,7 @@ def style():
   font = 42
   rt.gStyle.SetLegendFillColor(rt.kWhite)
 
+  rt.gStyle.SetOptTitle(0)
   rt.gStyle.SetTitleX(0.3)
   rt.gStyle.SetTitleW(0.4)
   rt.gStyle.SetCanvasBorderMode(0)

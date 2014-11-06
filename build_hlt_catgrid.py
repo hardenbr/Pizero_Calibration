@@ -143,7 +143,7 @@ class analysis:
     def build_sob_vs_s(self, outfile):
 
         
-        gROOT.ProcessLine("struct MyStruct{ Float_t ns; Float_t nb; Float_t sob; Int_t cat; Int_t gid;};")
+        gROOT.ProcessLine("struct MyStruct{ Float_t ns; Float_t nb; Float_t sob; Int_t cat; Int_t gid; Float_t prec; Float_t fom};")
 
         s = rt.MyStruct()
 
@@ -154,8 +154,10 @@ class analysis:
         tree.Branch("ns",AddressOf(s, "ns"), "ns/F")
         tree.Branch("nb",AddressOf(s, "nb"), "nb/F")
         tree.Branch("sob",AddressOf(s, "sob"), "sob/F")
+        tree.Branch("prec",AddressOf(s, "prec"), "prec/F")
         tree.Branch("gid",AddressOf(s, "gid"), "gid/I")
         tree.Branch("cat",AddressOf(s, "cat"), "cat/I")
+        tree.Branch("fom",AddressOf(s, "fom"), "fom/F")
 
         n_cats = len(self.categories)
         for cc in xrange(n_cats):
@@ -176,7 +178,9 @@ class analysis:
                 s.sob = fit_res.sob
                 s.ns = fit_res.ns
                 s.nb = fit_res.nb
-                
+                s.prec = fit_res.mu_over_error
+                s.fom = math.sqrt(1 + (1 / s.sob )) / math.sqrt(s.ns)
+        
                 tree.Fill()
 
         tree.Write()
@@ -298,7 +302,7 @@ parser.add_option( "--eta", dest="is_eta",
 
 
 parser.add_option( "--sample", dest="sample_name",
-                  help="name of the sample", default="13 TeV MC",
+                  help="name of the sample", default=" ",
                   action="store", type="string")
 
 parser.add_option("-w","--write", dest="do_write", help="write the fits and canvases",
@@ -310,20 +314,20 @@ def generate_tree_cut(cut, category):
 
 
     eta_cut = "(STr2_etaPi0_rec*STr2_etaPi0_rec) > %f && (STr2_etaPi0_rec*STr2_etaPi0_rec) < %f" % (category.eta_b*category.eta_b, category.eta_e * category.eta_e)
-    pt_cut = "(STr2_ptG1_rec > %f && STr2_ptG2_rec > %f) || (STr2_ptG1_rec > %f && STr2_ptG2_rec > %f)" % (cut[0], cut[6], cut[6], cut[0]) #check if either combination works...since we dont know which is the leading one
-    id_cut =  "STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
+    pt_cut = "(STr2_ptG1_nocor > %f && STr2_ptG2_nocor > %f)" % (cut[0], cut[0]) 
+    id_cut =  "STr2_ptPi0_nocor > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_HLTIsoPi0_rec < %f" % (cut[1], cut[2], cut[2], cut[3])
 
     total_cut = "(" + id_cut + ") && (" + eta_cut + ")" + " && (" + pt_cut + ")"
 
-    if not options.is_eb:
-        eta_cut = "(STr2_etaPi0_rec*STr2_etaPi0_rec) > %f && (STr2_etaPi0_rec*STr2_etaPi0_rec) < %f" % (category.eta_b*category.eta_b, category.eta_e * category.eta_e)
+    # if not options.is_eb:
+    #     eta_cut = "(STr2_etaPi0_rec*STr2_etaPi0_rec) > %f && (STr2_etaPi0_rec*STr2_etaPi0_rec) < %f" % (category.eta_b*category.eta_b, category.eta_e * category.eta_e)
 
-        id_cut =  "STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
+    #     id_cut =  "STr2_ptPi0_rec > %f && STr2_S4S9_1 > %f && STr2_S4S9_2 > %f && STr2_IsoPi0_rec < %f && STr2_n1CrisPi0_rec > %i && STr2_n2CrisPi0_rec > %i" % (cut[1], cut[2], cut[2], cut[3], cut[4], cut[5])
         
-        es_cut = "((STr2_Es_e1_1 + STr2_Es_e1_2) > %f  && (STr2_Es_e2_1 + STr2_Es_e2_2) > %f)" % (cut[6], cut[6])
-        pt_cut = "(STr2_ptG1_rec > %f && STr2_ptG2_rec > %f)" % (cut[0], cut[0])
-        #pt_cut = "(STr2_ptG1_rec > %f && STr2_ptG2_rec > %f) || (STr2_ptG1_rec > %f && STr2_ptG2_rec > %f)" % (cut[0], cut[0])
-        total_cut = "(" + id_cut + ") && (" + eta_cut + ") && (" + es_cut + ") && (" + pt_cut + ")"
+    #     es_cut = "((STr2_Es_e1_1 + STr2_Es_e2_1) > %f  && (STr2_Es_e1_2 + STr2_Es_e2_2) > %f)" % (cut[6], cut[6])
+    #     pt_cut = "(STr2_ptG1_rec > %f && STr2_ptG2_rec > %f)" % (cut[0], cut[0])
+    #     #pt_cut = "(STr2_ptG1_rec > %f && STr2_ptG2_rec > %f) || (STr2_ptG1_rec > %f && STr2_ptG2_rec > %f)" % (cut[0], cut[0])
+    #     total_cut = "(" + id_cut + ") && (" + eta_cut + ") && (" + es_cut + ") && (" + pt_cut + ")"
 
     print total_cut
 
@@ -338,10 +342,19 @@ def build_workspace_hist(tree, cut, grid_id, category):
     #hist_total = rt.TH1F("datahist_total","datahist_total",100,.05,.25)
 
     name = "datahist_%i_%i_%i" % (grid_id, category.eta_b*100, category.eta_e*100)
-    hist = rt.TH1F(name, name, 100, .05, .20)
-    if options.is_eta:
-        hist = rt.TH1F(name, name, 100, .25, .8)
 
+    hist = rt.TH1F(name, name, 100, .08, .20) if not options.is_eta else rt.TH1F(name, name, 100, .25, .8)
+
+    if options.is_eb:
+        if (cut[0]*2) > cut[1] + .75:
+            print "\t KINAMETICALLY UNFAVORED..SKPPING.....pt1 + pt2 > (ptpi0 + X).... pt1 + pt2 > ptpi0 + X: %f + %f > %f + X" % (cut[0], cut[0], cut[1]) 
+            return (None, hist, -1)
+    else:
+        if (cut[0] * 2) > cut[1] + .75:
+            print "\t KINAMETICALLY UNFAVORED..SKPPING.....pt1 + pt2 > (ptpi0 + X).... pt1 + pt2 > ptpi0 + X: %f + %f > %f + X" % (cut[0], cut[0], cut[1]) 
+            return (None, hist, -1)
+
+    #build the string to cut the tree into the histogram
     cut_string = generate_tree_cut(cut, category)
 
     n_events_cut = tree.GetEntries(cut_string)
@@ -349,10 +362,6 @@ def build_workspace_hist(tree, cut, grid_id, category):
         print "\t SKIPPING FIT....NOT ENOUGH EVENTS: %i" % n_events_cut
         return (None, hist, -1) #Return garbage if we dont care 
     
-    if options.is_eb:
-        if cut[0] < cut[6]:
-            print "\t GRID REDUNDANCY SKIPPING FIT.... pt1 < pt2: %f < %f" % (cut[0], cut[6]) 
-            return (None, hist, -1)
 
     tree.Draw("STr2_mPi0_rec>>%s" % name, cut_string)
     #tree.Draw("STr2_mPi0_rec>>datahist_total")
@@ -363,7 +372,9 @@ def build_workspace_hist(tree, cut, grid_id, category):
     #build the workspace
     workspace = rt.RooWorkspace("workspace")
 
-    variables = ["mpizero[.1., .05., .20]"]
+    variables = ["mpizero[.1., .08., .20]"]
+    if options.is_eta: 
+        variables = ["mpizero[.1., .25., .80]"]
 
     #factory all the variables
     for v in variables: workspace.factory(v)    
@@ -383,74 +394,31 @@ def build_workspace_hist(tree, cut, grid_id, category):
 
 def build_grid(is_EB):
 
-
-    #pizero scan range -- may 26 scan
-    #ncri1 = range(0, 1)
-    #ncri2 = range(0, 1)
-    #pi_cluster_pt = np.linspace(.4, 1.2, 5)
-    #pi_pizero_pt = np.linspace(1.2, 2.4, 5)
-    #pi_s4s9 = np.linspace(.7, .98, 5)
-    #pi_iso = np.linspace(.2, .5, 5)
-
-    #pizero scan range -- may 27 scan
-    #ncri1 = range(0, 1)
-    #ncri2 = range(0, 1)
-    #pi_cluster_pt = np.linspace(1, 2, 5)
-    #pi_pizero_pt = np.linspace(.5, 2, 5)
-    #pi_s4s9 = np.linspace(.85, .98, 5)
-    #pi_iso = np.linspace(.4, 1, 5)
-
-    #pizero scan range -- may 27 scan TWEAK
-    #ncri1 = range(0, 1)
-    #ncri2 = range(0, 1)
-    #pi_cluster_pt = np.linspace(2, 3, 5)
-    #pi_pizero_pt = np.linspace(.1, .5, 5)
-    #pi_s4s9 = np.linspace(.92, .92, 1)
-    #pi_iso = np.linspace(.85, 1, 1)
-
-    #pizero barrel scan range -- jun 18, 2014
-    ncri1 = range(6, 9)
-    ncri2 = range(6, 8)
-    pi_cluster_pt_1 = np.linspace(1.5, 3, 6)
-    pi_cluster_pt_2 = np.linspace(1.5, 3, 6)
-    pi_pizero_pt = np.linspace(.5, 1.5, 6)
-    pi_s4s9 = np.linspace(.92, .92, 1)
-    pi_iso = np.linspace(1, 1, 1)
+    #barrel scan loose
+    pi_cluster_pt_1 = np.linspace(.5, 2.0, 6)
+    pi_pizero_pt = np.linspace(2.5, 5.0, 6)
+    pi_s4s9 = np.linspace(.75, .9, 6)
+    pi_iso = np.linspace(100, 100, 1)
 
     #eta barrel scan range -- august 13, 2014
     if options.is_eta:
-        ncri1 = range(5, 8)
-        ncri2 = range(5, 7)
-        pi_cluster_pt_1 = np.linspace(1, 2.5, 6)
-        pi_cluster_pt_2 = np.linspace(1, 2.5, 6)
-        pi_pizero_pt = np.linspace(1.5, 4, 6)
-        pi_s4s9 = np.linspace(.92, .92, 1)
-        pi_iso = np.linspace(1, 1, 1)
+        pi_cluster_pt_1 = np.linspace(1.0, 3, 6)        
+        pi_pizero_pt = np.linspace(2.5, 5.0, 6)
+        pi_s4s9 = np.linspace(.7, .9, 5)
+        pi_iso = np.linspace(0, .3, 4)
 
     #list the cuts together
-    pizero_cuts = (pi_cluster_pt_1, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2, pi_cluster_pt_2)
+    pizero_cuts = (pi_cluster_pt_1, pi_pizero_pt, pi_s4s9, pi_iso)
 
     #use a different grid for the endcap
     if not options.is_eb:
-        #cystals scan range -------- may 26 scan
-        #ncri1 = range(6, 10)
-        #ncri2 = range(5, 9)
-        #pi_cluster_pt = np.linspace(.4, 1.2, 4)
-        #pi_pizero_pt = np.linspace(1.2, 2.4, 4)
-        #pi_s4s9 = np.linspace(.7, .9, 3)
-        #pi_iso = np.linspace(.2, .5, 3)
-        #es = np.linspace(0, 1, 3)
-
-        ncri1 = range(6, 9)
-        ncri2 = range(2, 7)
-        pi_cluster_pt = np.linspace(.5, 1.5, 5)
-        pi_pizero_pt = np.linspace(1.5, 3, 5)
-        pi_s4s9 = np.linspace(.92, .92, 1)
-        pi_iso = np.linspace(1, 1, 1)
-        es = np.linspace(0, .8, 5)
+        pi_cluster_pt_1 = np.linspace(.4, 2.0, 6)
+        pi_pizero_pt = np.linspace(1.0, 3.0, 6)
+        pi_s4s9 = np.linspace(.75, .9, 6)
+        pi_iso = np.linspace(.5, .6, 6)
 
         #list the cuts together
-        pizero_cuts = (pi_cluster_pt, pi_pizero_pt, pi_s4s9, pi_iso, ncri1, ncri2, es)
+        pizero_cuts = (pi_cluster_pt_1, pi_pizero_pt, pi_s4s9, pi_iso)
 
     #take all possible combinations
     pi_grid = list(itertools.product(*pizero_cuts))
@@ -460,14 +428,14 @@ def build_grid(is_EB):
 def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 
     #set the ranges based on the particle
-    x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .05, .20,"GeV")
-    mean  = rt.RooRealVar("m","#pi^{0} peak position", .12, .11, .135,"GeV")
-    sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .011, .010, .0140,"GeV")
+    x  = rt.RooRealVar("mpizero","#pi^{0} invariant mass", .08, .20,"GeV")
+    mean  = rt.RooRealVar("m","#pi^{0} peak position", .12, .11, .155,"GeV")
+    sigma  = rt.RooRealVar("sigma","#pi^{0} core #sigma", .011, .006, .0140,"GeV")
 
     if options.is_eta:
         x  = rt.RooRealVar("mpizero","#eta invariant mass", .25, .80,"GeV")
         mean  = rt.RooRealVar("m","#eta peak position", .525, .45, .58,"GeV")
-        sigma  = rt.RooRealVar("sigma","#eta core #sigma", .5, .35, .6,"GeV")
+        sigma  = rt.RooRealVar("sigma","#eta core #sigma", .02, .015, .045,"GeV")
 
     #build the signal model for the pizero or eta
     gaus = rt.RooGaussian("gaus","Core Gaussian", x, mean, sigma)
@@ -500,9 +468,9 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
     n_bkg = rt.RooRealVar("nbkg","background yield",tot*.7, tot*.5, tot*.95)
 
     #changing the normalization is not necessary yet
-    #if options.is_eta:
-    #    n_sig = rt.RooRealVar("nsig","#eta yield", tot*.1,tot*.02, tot*.6)
-    #    n_bkg = rt.RooRealVar("nbkg","background yield",tot*.7, tot*.5, tot*.95)
+    if options.is_eta:
+        n_sig = rt.RooRealVar("nsig","#eta yield", tot*.1,tot*.0001, tot*.2)
+        n_bkg = rt.RooRealVar("nbkg","background yield",tot*.7, tot*.5, tot*.95)
 
     model =  rt.RooAddPdf("model","sig+bkg",rt.RooArgList(gaus,bkg), rt.RooArgList(n_sig,n_bkg))
     
@@ -521,7 +489,7 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
     
     #declare the signal over background range
     x.setRange("sobRange",mean.getVal()-2.*sigma.getVal(), mean.getVal()+2.*sigma.getVal())
-    x.setRange("FULL",.05,.20)
+    x.setRange("FULL",.08,.20)
     if options.is_eta:
         x.setRange("FULL", .25, .8)
 
@@ -608,28 +576,23 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 
     sob_line = "S/B: %.3f #pm %.3f ( %1.1f / %1.1f)" % (s_over_b, error_e, n_s_sob, n_b_sob)
     chi_sq_line = "reduced #chi^{2}: %.2f," % chi2
-    gaus_line = "#mu: %.4f, #sigma: %.4f, #mu/err: %.1f" % (mean_val,sigma_val,mu_over_err)
+    gaus_line = "#mu: %.4f, #sigma: %.4f, #mu/#sigma_{#mu}: %.1f" % (mean_val,sigma_val,mu_over_err)
 
     # determin the line of text displaying the cuts applied
     if options.is_eb:
-        cut_line = "p_{t,#gamma1} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i, p_{t,#gamma2} > %2.2f" % cut
+        cut_line = "p_{t,#gamma1} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f" % cut
         if options.is_eta:
-            cut_line = "p_{t,#gamma1} > %2.2f, p_{t,#eta} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i, p_{t,#gamma2} > %2.2f" % cut
+            cut_line = "p_{t,#gamma1} > %2.2f, p_{t,#eta} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f" % cut
     else:
-        cut_line = "p_{t,#gamma} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i, ES_{1+2} > %2.2f" % cut
+        cut_line = "p_{t,#gamma} > %2.2f, p_{t,#pi^{0}} > %2.2f, S_{4}/S_{9} > %2.2f, iso > %2.2f" % cut
         if options.is_eta:
-            cut_line = "p_{t,#gamma} > %2.2f, p_{t,#eta} > %2.2f, S_{4}/S_{9} > %2.2f, iso < %2.2f, Ncri_{1} > %i,  Ncri_{2} > %i, ES_{1+2} > %2.2f" % cut
+            cut_line = "p_{t,#gamma} > %2.2f, p_{t,#eta} > %2.2f, S_{4}/S_{9} > %2.2f, iso > %2.2f " % cut
 
     l1_line = "Grid Point # %i  Category: %2.2f < |#eta| < %2.2f" % (il1, cat.eta_b, cat.eta_e)
 
     sample_line = "Sample: %s" % options.sample_name
 
-    type_line = None
-
-    if options.is_eb:
-        type_line = "EB"
-    else:
-        type_line = "EE"
+    type_line = "EB" if options.is_eb else  "EE"
 
     lat = rt.TLatex()
     lat.SetNDC()
@@ -665,7 +628,7 @@ def fit_dataset(rdata, il1, eff, iSamp, cat, cut):
 #################
 
 file = rt.TFile(options.filename)
-tree = file.Get("Tree_HLT")
+tree = file.Get("Tree_Optim")
 
 outfile = rt.TFile(options.outfilename, "RECREATE")
 
@@ -707,13 +670,8 @@ else:
    #ENDCAP
    analysis.add_category(1.5, 1.8)
    analysis.add_category(1.8, 2.0)
-   analysis.add_category(2.0, 2.2)
+   #analysis.add_category(2.0, 2.2)
    #analysis.add_category(2.2, 2.5)
-   #analysis.add_category(2.2, 2.5)
-   #analysis.add_category(2.2, 2.3)
-   #analysis.add_category(2.3, 2.4)
-   #analysis.add_category(2.4, 2.5)
-
 
 #initialize the grid points
 analysis.initialize_grid()
